@@ -1,0 +1,4 @@
+fastmcp==2.8.1
+python-binance==1.0.22
+tradingview-ta==3.3.0
+python-dotenv==1.1.1

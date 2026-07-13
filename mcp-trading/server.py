@@ -1,0 +1,34 @@
+"""
+MCP Trading Server — Entry point.
+
+Exposes crypto trading tools (Binance + TradingView) via MCP protocol.
+Supports stdio (local) and streamable-http (remote) transports.
+
+Usage:
+    Local (stdio):   python server.py
+    Remote (HTTP):   python server.py --http
+    Docker:          MCP_TRANSPORT=http python server.py
+"""
+
+import os
+import sys
+
+from fastmcp import FastMCP
+from src.tools import register_all_tools
+
+# Create MCP server
+mcp = FastMCP("Trading MCP")
+
+# Register all tools
+register_all_tools(mcp)
+
+
+if __name__ == "__main__":
+    transport = "streamable-http" if ("--http" in sys.argv or os.getenv("MCP_TRANSPORT") == "http") else "stdio"
+
+    if transport == "streamable-http":
+        host = os.getenv("MCP_HOST", "0.0.0.0")
+        port = int(os.getenv("MCP_PORT", "8000"))
+        mcp.run(transport=transport, host=host, port=port)
+    else:
+        mcp.run()
