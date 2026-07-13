@@ -65,6 +65,7 @@
     "@japa/api-client": "^3.2.1",
     "@tuyau/core": "^1.2.2",
     "@vinejs/vine": "^4.4.0",
+    "aws-jwt-verify": "^5.2.1",
     "luxon": "^3.7.2",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2"
@@ -72,7 +73,8 @@
   "hotHook": {
     "boundaries": [
       "./app/controllers/**/*.ts",
-      "./app/middleware/*.ts"
+      "./app/middleware/*.ts",
+      "./start/routes.ts"
     ]
   },
   "prettier": "@adonisjs/prettier-config"

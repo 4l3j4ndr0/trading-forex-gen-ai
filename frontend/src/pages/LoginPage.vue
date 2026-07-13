@@ -100,7 +100,7 @@ watch(() => auth.authStatus, async (status) => {
   }
 })
 
-onMounted(async () => {
+onMounted(() => {
   if (authStore.isAuthenticated) {
     void router.replace('/dashboard')
   }
@@ -175,16 +175,17 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   background: #f8fafc;
-  padding: 24px;
+  padding: 32px;
 }
 .login-card {
   background: white;
   border-radius: 16px;
-  padding: 48px 40px;
+  padding: 40px 32px;
   width: 100%;
-  max-width: 440px;
+  max-width: 480px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
   border: 1px solid #e2e8f0;
+  overflow: hidden;
 }
 .login-header {
   text-align: center;
@@ -204,14 +205,23 @@ onMounted(async () => {
   --amplify-colors-brand-primary-90: #0284c7;
   --amplify-colors-brand-primary-100: #0369a1;
   width: 100%;
+  max-width: 100%;
 }
 :deep([data-amplify-router]) {
   box-shadow: none;
   border: none;
   padding: 0;
+  max-width: 100%;
 }
 :deep([data-amplify-form]) {
   padding: 0;
+}
+:deep([data-amplify-authenticator] [data-amplify-container]) {
+  width: 100%;
+  max-width: 100%;
+}
+:deep(.amplify-tabs) {
+  margin: 0 0 16px 0;
 }
 
 /* ── Responsive ── */

@@ -36,6 +36,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   MASSIVE_API_KEY: Env.schema.string.optional(),
   MASSIVE_BASE_URL: Env.schema.string({ format: 'url', tld: false }),
 
+  // AWS Cognito
+  COGNITO_USER_POOL_ID: Env.schema.string(),
+  COGNITO_CLIENT_ID: Env.schema.string(),
+
   // Frontend URL (CORS)
   FRONTEND_URL: Env.schema.string({ format: 'url', tld: false }),
 })

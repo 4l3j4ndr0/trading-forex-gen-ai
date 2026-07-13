@@ -6,5 +6,5 @@ window.global = window.global || window
 window.process = window.process || ({ env: {} } as unknown as NodeJS.Process)
 
 export default defineBoot(() => {
-  Amplify.configure(outputs as Parameters<typeof Amplify.configure>[0])
+  Amplify.configure(outputs)
 })
