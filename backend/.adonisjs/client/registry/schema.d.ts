@@ -31,4 +31,28 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/me_controller').default['updateSettings']>>>
     }
   }
+  'analysis.run': {
+    methods: ["POST"]
+    pattern: '/api/v1/analysis/run'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/analysis_controller').default['run']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/analysis_controller').default['run']>>>
+    }
+  }
+  'analysis.signals': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/signals'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/analysis_controller').default['signals']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/analysis_controller').default['signals']>>>
+    }
+  }
 }

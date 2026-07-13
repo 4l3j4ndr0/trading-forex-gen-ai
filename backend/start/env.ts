@@ -40,6 +40,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   COGNITO_USER_POOL_ID: Env.schema.string(),
   COGNITO_CLIENT_ID: Env.schema.string(),
 
+  // AWS Bedrock
+  AWS_REGION: Env.schema.string.optional(),
+  BEDROCK_MODEL_ID: Env.schema.string.optional(),
+
   // Frontend URL (CORS)
   FRONTEND_URL: Env.schema.string({ format: 'url', tld: false }),
 })

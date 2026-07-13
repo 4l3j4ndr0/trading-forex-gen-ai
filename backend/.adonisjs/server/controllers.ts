@@ -5,4 +5,5 @@
 
 export const controllers = {
   Me: () => import('#controllers/me_controller'),
+  Analysis: () => import('#controllers/analysis_controller'),
 }
