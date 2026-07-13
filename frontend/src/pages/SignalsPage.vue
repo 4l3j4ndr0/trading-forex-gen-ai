@@ -261,41 +261,43 @@
         <div class="text-h6 text-grey-5 q-mt-md">No hay análisis ejecutados</div>
       </div>
 
-      <div v-else class="q-gutter-md">
+      <div v-else class="q-gutter-sm">
         <q-card v-for="analysis in analyses" :key="analysis.id" flat bordered class="analysis-history-card">
-          <q-card-section class="q-pb-sm">
-            <div class="row items-center justify-between">
-              <div class="row items-center q-gutter-sm">
+          <q-expansion-item
+            :label="analysis.pair_symbol"
+            :caption="`${formatDate(analysis.created_at)} · ${((analysis.duration_ms ?? 0) / 1000).toFixed(1)}s · ${analysis.trigger_type}`"
+            group="analyses"
+            header-class="analysis-header"
+          >
+            <template #header>
+              <q-item-section avatar>
                 <q-icon
                   :name="analysis.status === 'completed' ? 'check_circle' : 'error'"
                   :color="analysis.status === 'completed' ? 'positive' : 'negative'"
-                  size="20px"
                 />
-                <span class="text-subtitle2 text-weight-bold">{{ analysis.pair_symbol }}</span>
-                <q-badge outline color="grey-7" class="text-capitalize">
-                  {{ analysis.trigger_type }}
-                </q-badge>
-                <q-badge color="blue-1" text-color="blue-9">
-                  {{ analysis.timeframe_primary }}
-                </q-badge>
-              </div>
-              <div class="row items-center q-gutter-xs">
-                <q-badge v-if="analysis.duration_ms" outline color="grey-6">
-                  ⏱️ {{ ((analysis.duration_ms) / 1000).toFixed(1) }}s
-                </q-badge>
-                <span class="text-caption text-grey-6">
-                  {{ formatDate(analysis.created_at) }}
-                </span>
-              </div>
-            </div>
-          </q-card-section>
+              </q-item-section>
+              <q-item-section>
+                <q-item-label class="text-weight-bold">
+                  {{ analysis.pair_symbol }}
+                  <q-badge color="blue-1" text-color="blue-9" class="q-ml-sm">
+                    {{ analysis.timeframe_primary }}
+                  </q-badge>
+                  <q-badge outline color="grey-6" class="q-ml-xs text-capitalize">
+                    {{ analysis.trigger_type }}
+                  </q-badge>
+                </q-item-label>
+                <q-item-label caption>
+                  {{ formatDate(analysis.created_at) }} · ⏱️ {{ ((analysis.duration_ms ?? 0) / 1000).toFixed(1) }}s
+                </q-item-label>
+              </q-item-section>
+            </template>
 
-          <q-separator />
-
-          <q-card-section class="q-pt-md analysis-markdown-content">
-            <!-- eslint-disable-next-line vue/no-v-html -->
-            <div v-html="renderMarkdown(analysis.ai_reasoning)"></div>
-          </q-card-section>
+            <q-separator />
+            <q-card-section class="analysis-markdown-content">
+              <!-- eslint-disable-next-line vue/no-v-html -->
+              <div v-html="renderMarkdown(analysis.ai_reasoning)"></div>
+            </q-card-section>
+          </q-expansion-item>
         </q-card>
       </div>
 
@@ -391,7 +393,7 @@ const analyses = ref<AnalysisRecord[]>([])
 const loadingAnalyses = ref(false)
 const analysesPage = ref(1)
 const analysesTotal = ref(0)
-const analysesLimit = 5
+const analysesLimit = 15
 
 const filterOptions = [
   { label: 'Todas', value: 'all' },
@@ -583,6 +585,13 @@ onMounted(() => {
 
 .analysis-history-card {
   border-radius: 12px;
+  overflow: hidden;
+}
+.analysis-history-card :deep(.analysis-header) {
+  padding: 12px 16px;
+}
+.analysis-history-card :deep(.q-expansion-item__toggle-icon) {
+  color: #64748b;
 }
 
 /* Markdown rendered content */
