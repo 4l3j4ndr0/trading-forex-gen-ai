@@ -1,4 +1,4 @@
-"""Binance Futures API client — lazy initialization to avoid startup failures."""
+"""Binance Futures API client — credentials from MCP request context."""
 
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
@@ -6,28 +6,31 @@ from binance.exceptions import BinanceAPIException
 from src.core.config import config
 
 
+def get_binance_client(api_key: str = None, api_secret: str = None, testnet: bool = None) -> Client:
+    """Create a Binance client with the given credentials."""
+    key = api_key or config.binance_api_key
+    secret = api_secret or config.binance_api_secret
+    is_testnet = testnet if testnet is not None else config.binance_testnet
+
+    client = Client(key, secret, testnet=is_testnet)
+    if is_testnet:
+        client.API_URL = "https://testnet.binancefuture.com/fapi"
+    return client
+
+
 class BinanceClient:
-    """Wrapper around python-binance for Futures trading. Lazy init."""
+    """Wrapper around python-binance for Futures trading.
+    
+    Uses credentials from .env as fallback, but tools can pass
+    per-request credentials from the MCP client headers.
+    """
 
-    def __init__(self):
-        self._client = None
+    def _client(self, api_key: str = None, api_secret: str = None, testnet: bool = None) -> Client:
+        return get_binance_client(api_key, api_secret, testnet)
 
-    def _get_client(self) -> Client:
-        """Lazy-init: only connects when first used."""
-        if self._client is None:
-            self._client = Client(
-                config.binance_api_key,
-                config.binance_api_secret,
-                testnet=config.binance_testnet,
-            )
-            if config.binance_testnet:
-                # Override to Futures testnet
-                self._client.API_URL = "https://testnet.binancefuture.com/fapi"
-        return self._client
-
-    def get_balance(self) -> dict:
+    def get_balance(self, api_key: str = None, api_secret: str = None, testnet: bool = None) -> dict:
         try:
-            account = self._get_client().futures_account()
+            account = self._client(api_key, api_secret, testnet).futures_account()
             return {
                 "total_balance": float(account["totalWalletBalance"]),
                 "available_balance": float(account["availableBalance"]),
@@ -39,13 +42,13 @@ class BinanceClient:
         except Exception as e:
             return {"error": f"Connection error: {str(e)}"}
 
-    def get_price(self, symbol: str) -> float:
-        ticker = self._get_client().futures_symbol_ticker(symbol=symbol)
+    def get_price(self, symbol: str, api_key: str = None, api_secret: str = None, testnet: bool = None) -> float:
+        ticker = self._client(api_key, api_secret, testnet).futures_symbol_ticker(symbol=symbol)
         return float(ticker["price"])
 
-    def open_market_order(self, symbol: str, side: str, quantity: float) -> dict:
+    def open_market_order(self, symbol: str, side: str, quantity: float, api_key: str = None, api_secret: str = None, testnet: bool = None) -> dict:
         try:
-            order = self._get_client().futures_create_order(
+            order = self._client(api_key, api_secret, testnet).futures_create_order(
                 symbol=symbol,
                 side=side.upper(),
                 type="MARKET",
@@ -64,9 +67,9 @@ class BinanceClient:
         except Exception as e:
             return {"error": f"Connection error: {str(e)}"}
 
-    def close_market_order(self, symbol: str, side: str, quantity: float) -> dict:
+    def close_market_order(self, symbol: str, side: str, quantity: float, api_key: str = None, api_secret: str = None, testnet: bool = None) -> dict:
         try:
-            order = self._get_client().futures_create_order(
+            order = self._client(api_key, api_secret, testnet).futures_create_order(
                 symbol=symbol,
                 side=side.upper(),
                 type="MARKET",
@@ -86,9 +89,9 @@ class BinanceClient:
         except Exception as e:
             return {"error": f"Connection error: {str(e)}"}
 
-    def get_symbol_info(self, symbol: str) -> dict:
+    def get_symbol_info(self, symbol: str, api_key: str = None, api_secret: str = None, testnet: bool = None) -> dict:
         try:
-            info = self._get_client().futures_exchange_info()
+            info = self._client(api_key, api_secret, testnet).futures_exchange_info()
             for s in info["symbols"]:
                 if s["symbol"] == symbol:
                     filters = {f["filterType"]: f for f in s["filters"]}
@@ -108,5 +111,5 @@ class BinanceClient:
             return {"error": f"Connection error: {str(e)}"}
 
 
-# Singleton — lazy, won't connect until first tool call
+# Singleton
 binance = BinanceClient()

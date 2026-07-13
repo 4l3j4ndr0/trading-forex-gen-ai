@@ -4,14 +4,22 @@ MCP Trading Server — Entry point.
 Exposes crypto trading tools (Binance + TradingView) via MCP protocol.
 Supports stdio (local) and streamable-http (remote) transports.
 
+Binance credentials are sent by the client via headers:
+    - X-Binance-Api-Key: <key>
+    - X-Binance-Api-Secret: <secret>
+    - X-Binance-Testnet: true/false
+
 Usage:
     Local (stdio):   python server.py
     Remote (HTTP):   python server.py --http
-    Docker:          MCP_TRANSPORT=http python server.py
 """
 
 import os
 import sys
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from fastmcp import FastMCP
 from src.tools import register_all_tools

@@ -12,9 +12,18 @@ def register_portfolio_tools(mcp):
     """Register all portfolio management tools."""
 
     @mcp.tool()
-    def get_open_positions() -> str:
+    def get_open_positions(
+        binance_api_key: str = None,
+        binance_api_secret: str = None,
+        binance_testnet: bool = True,
+    ) -> str:
         """
         Get all open positions with live PnL from Binance.
+
+        Args:
+            binance_api_key: Binance API key
+            binance_api_secret: Binance API secret
+            binance_testnet: Use testnet (default true)
 
         Returns:
             List of open trades with entry, current price, unrealized PnL, and age.
@@ -25,7 +34,10 @@ def register_portfolio_tools(mcp):
 
         for t in trades:
             try:
-                current_price = binance.get_price(t["symbol"])
+                if binance_api_key and binance_api_secret:
+                    current_price = binance.get_price(t["symbol"], binance_api_key, binance_api_secret, binance_testnet)
+                else:
+                    current_price = t["entry_price"]  # fallback if no keys
             except Exception:
                 current_price = t["entry_price"]
 
@@ -53,14 +65,25 @@ def register_portfolio_tools(mcp):
         return json.dumps({"open_count": len(positions), "positions": positions})
 
     @mcp.tool()
-    def get_account_balance() -> str:
+    def get_account_balance(
+        binance_api_key: str = None,
+        binance_api_secret: str = None,
+        binance_testnet: bool = True,
+    ) -> str:
         """
         Get Binance Futures account balance.
+
+        Args:
+            binance_api_key: Binance API key
+            binance_api_secret: Binance API secret
+            binance_testnet: Use testnet (default true)
 
         Returns:
             Total balance, available margin, unrealized PnL.
         """
-        return json.dumps(binance.get_balance())
+        if not binance_api_key or not binance_api_secret:
+            return json.dumps({"error": "binance_api_key and binance_api_secret are required"})
+        return json.dumps(binance.get_balance(binance_api_key, binance_api_secret, binance_testnet))
 
     @mcp.tool()
     def trade_history(period: str = "today", symbol: str = None) -> str:
@@ -110,9 +133,12 @@ def register_portfolio_tools(mcp):
         pnl_this_hour: float = None,
         symbols_analyzed: str = None,
         market_context: str = None,
+        binance_api_key: str = None,
+        binance_api_secret: str = None,
+        binance_testnet: bool = True,
     ) -> str:
         """
-        Log the agent's hourly decision for auditing and performance tracking.
+        Log the agent's hourly decision for auditing.
 
         Args:
             trades_opened: Trades opened this cycle
@@ -121,8 +147,14 @@ def register_portfolio_tools(mcp):
             pnl_this_hour: Realized PnL this hour
             symbols_analyzed: JSON summary of analysis
             market_context: Brief market description
+            binance_api_key: Binance API key (for balance)
+            binance_api_secret: Binance API secret
+            binance_testnet: Use testnet
         """
-        balance = binance.get_balance()
+        balance = {}
+        if binance_api_key and binance_api_secret:
+            balance = binance.get_balance(binance_api_key, binance_api_secret, binance_testnet)
+
         open_trades = db.get_open_trades()
 
         db.insert_hourly_log(
