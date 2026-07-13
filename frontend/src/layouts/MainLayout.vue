@@ -47,9 +47,9 @@
           <q-item-section>Mercado</q-item-section>
         </q-item>
 
-        <q-item disable>
+        <q-item clickable to="/signals" active-class="text-primary">
           <q-item-section avatar>
-            <q-icon name="gps_fixed" color="grey-5" />
+            <q-icon name="gps_fixed" />
           </q-item-section>
           <q-item-section>Señales</q-item-section>
         </q-item>

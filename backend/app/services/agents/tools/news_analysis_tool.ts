@@ -166,11 +166,39 @@ export const newsAnalysisTool = tool({
     if (utcHour >= 12 && utcHour < 16) activeSessions.push('London-NY Overlap (máxima liquidez)')
     if (activeSessions.length === 0) activeSessions = ['Baja liquidez (entre sesiones)']
 
+    // Buscar eventos geopolíticos recientes (últimas 48h) que afecten sentimiento
+    const geopoliticalEvents = await db
+      .from('economic_events')
+      .where('event_at', '>=', new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString())
+      .where('event_at', '<=', now.toISOString())
+      .whereILike('title', '%tension%')
+      .orWhereILike('title', '%war%')
+      .orWhereILike('title', '%military%')
+      .orWhereILike('title', '%crisis%')
+      .orWhereILike('title', '%sanctions%')
+      .orderBy('event_at', 'desc')
+      .limit(5)
+
+    const geopoliticalContext =
+      geopoliticalEvents.length > 0
+        ? geopoliticalEvents.map((e: Record<string, unknown>) => e.title as string)
+        : []
+
+    // Sentimiento general basado en eventos
+    let marketSentiment: 'risk_on' | 'risk_off' | 'neutral' = 'neutral'
+    if (geopoliticalContext.some((t) => t.toLowerCase().includes('tension') || t.toLowerCase().includes('military'))) {
+      marketSentiment = 'risk_off'
+      if (riskLevel === 'low') riskLevel = 'medium'
+      warnings.push('📊 Sentimiento risk-off por tensiones geopolíticas — USD y JPY como refugio, monedas de riesgo (AUD, NZD, CAD) presionadas.')
+    }
+
     return JSON.stringify({
       symbol,
       currencies,
       timestamp: now.toISOString(),
       activeSessions,
+      marketSentiment,
+      geopoliticalContext,
       newsAssessment: {
         safeToTrade,
         riskLevel,
@@ -194,7 +222,9 @@ export const newsAnalysisTool = tool({
       recommendation: safeToTrade
         ? riskLevel === 'low'
           ? '✅ Sin eventos de impacto. Seguro para operar.'
-          : '⚠️ Precaución — hay eventos próximos. Operar con SL ajustado o reducir exposición.'
+          : riskLevel === 'medium'
+            ? '⚠️ Precaución — hay factores de riesgo. Operar con SL ajustado o reducir exposición.'
+            : '⚠️ Alto riesgo por eventos próximos. Considerar no operar o reducir significativamente la exposición.'
         : '🚫 NO OPERAR — Evento de alto impacto inminente. Esperar mínimo 30 minutos post-noticia.',
     })
   },
