@@ -1,0 +1,69 @@
+{
+  "name": "forex-trading-agent",
+  "description": "Agente principal para el sistema de Trading Forex con análisis técnico multi-temporalidad, gestión de riesgo y decisiones de entrada al mercado usando múltiples sub-agentes especializados",
+  "prompt": "file://.kiro/prompts/forex-trading-prompt.md",
+  "tools": ["read", "write", "shell", "grep", "glob"],
+  "allowedTools": ["read", "grep", "glob"],
+  "toolsSettings": {
+    "write": {
+      "allowedPaths": ["src/**", "backend/**", "public/**", "src-pwa/**"],
+      "deniedPaths": ["node_modules/**", "backend/node_modules/**"]
+    },
+    "shell": {
+      "allowedCommands": [
+        "quasar dev.*",
+        "quasar build.*",
+        "node ace.*",
+        "npm run.*",
+        "pnpm.*",
+        "docker compose.*",
+        "git status",
+        "git diff.*",
+        "git log.*",
+        "git branch.*",
+        "cat.*",
+        "ls.*",
+        "curl.*api.*"
+      ],
+      "deniedCommands": ["rm -rf.*", "sudo.*", "git push --force.*", "git reset --hard.*"],
+      "autoAllowReadonly": true
+    }
+  },
+  "resources": [
+    "file://README.md",
+    "file://package.json",
+    "file://backend/package.json",
+    "file://src/router/routes.ts",
+    "file://backend/start/routes.ts",
+    "file://.kiro/steering/**/*.md",
+    "skill://.kiro/skills/**/SKILL.md"
+  ],
+  "hooks": {
+    "agentSpawn": [
+      {
+        "command": "echo '📈 Forex Trading Agent activo — Stack: Quasar(Vue3)+AdonisJS6+PostgreSQL | Multi-Agente: Análisis Técnico + Gestión de Riesgo + Señales'"
+      }
+    ],
+    "preToolUse": [
+      {
+        "matcher": "write",
+        "command": "echo 'Verificando escritura en proyecto Forex Trading System'"
+      }
+    ],
+    "stop": [
+      {
+        "command": "cd backend && node ace typecheck 2>&1 | tail -5 || true",
+        "timeout_ms": 15000
+      }
+    ]
+  },
+  "mcpServers": {
+    "aws-knowledge-mcp-server": {
+      "url": "https://knowledge-mcp.global.api.aws",
+      "type": "http",
+      "disabled": false
+    }
+  },
+  "keyboardShortcut": "ctrl+shift+f",
+  "welcomeMessage": "📈 Forex Trading Agent listo. ¿En qué módulo trabajamos? (análisis-técnico, gestión-riesgo, señales, dashboard, backend-api)"
+}

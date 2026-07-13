@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+frontend/dist/
+backend/build/
+
+# Environment (secrets)
+.env
+.env.local
+.env.*.local
+backend/.env
+!backend/.env.example
+
+# AWS Amplify
+frontend/amplify_outputs.json
+frontend/.amplify/
+amplify_outputs.json
+.amplify/
+
+# IDE
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cache
+.cache/
+frontend/.quasar/
+
+# Temp
+tmp/
+backend/tmp/
+
+# Coverage
+coverage/
+
+# PDF research docs (large files)
+*.pdf

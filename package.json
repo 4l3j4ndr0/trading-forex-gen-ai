@@ -1,0 +1,17 @@
+{
+  "name": "trading-forex-gen-ai",
+  "version": "0.1.0",
+  "description": "Sistema de Trading Forex con IA — Análisis técnico multi-temporalidad y señales de entrada",
+  "private": true,
+  "scripts": {
+    "dev:front": "cd frontend && npx quasar dev",
+    "dev:back": "cd backend && node ace serve --hmr",
+    "dev": "concurrently \"npm run dev:front\" \"npm run dev:back\"",
+    "build:front": "cd frontend && npx quasar build",
+    "build:back": "cd backend && node ace build",
+    "lint": "concurrently \"cd frontend && npm run lint\" \"cd backend && npm run lint\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

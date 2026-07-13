@@ -1,0 +1,41 @@
+{
+  "name": "forex-analisis-tecnico",
+  "description": "Agente especializado en análisis técnico multi-temporalidad Forex. Detecta patrones, calcula indicadores (EMA, RSI, MACD, Bollinger, ATR, ADX), identifica niveles de soporte/resistencia y genera señales de confluencia",
+  "prompt": "file://.kiro/prompts/analisis-tecnico-prompt.md",
+  "tools": ["read", "write", "shell", "grep", "glob"],
+  "allowedTools": ["read", "grep", "glob"],
+  "toolsSettings": {
+    "write": {
+      "allowedPaths": ["src/modules/analisis-tecnico/**", "backend/app/services/analisis/**", "backend/app/controllers/analisis_controller.ts"],
+      "deniedPaths": ["node_modules/**"]
+    },
+    "shell": {
+      "allowedCommands": [
+        "node ace.*",
+        "npm run.*",
+        "curl.*",
+        "cat.*",
+        "ls.*"
+      ],
+      "deniedCommands": ["rm -rf.*", "sudo.*"],
+      "autoAllowReadonly": true
+    }
+  },
+  "resources": [
+    "file://backend/app/services/analisis/**/*.ts",
+    "file://backend/app/services/market/**/*.ts",
+    "file://src/modules/analisis-tecnico/**/*",
+    "skill://.kiro/skills/analisis-tecnico/SKILL.md",
+    "skill://.kiro/skills/indicadores/SKILL.md",
+    "skill://.kiro/skills/massive-api/SKILL.md"
+  ],
+  "hooks": {
+    "agentSpawn": [
+      {
+        "command": "echo '🔬 Agente Análisis Técnico Multi-Temporalidad activo — Indicadores: EMA/RSI/MACD/BB/ATR/ADX | Temporalidades: M5/M15/H1/H4/D1'"
+      }
+    ]
+  },
+  "keyboardShortcut": "ctrl+shift+t",
+  "welcomeMessage": "🔬 Agente de Análisis Técnico listo. Puedo analizar pares, calcular indicadores, detectar patrones y evaluar confluencias multi-temporalidad."
+}

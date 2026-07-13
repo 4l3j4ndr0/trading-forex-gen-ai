@@ -1,0 +1,40 @@
+{
+  "name": "forex-senales",
+  "description": "Agente especializado en generación y evaluación de señales de entrada/salida del mercado Forex. Combina confluencias de múltiples indicadores, valida condiciones de mercado y emite recomendaciones de operación",
+  "prompt": "file://.kiro/prompts/senales-prompt.md",
+  "tools": ["read", "write", "shell", "grep", "glob"],
+  "allowedTools": ["read", "grep", "glob"],
+  "toolsSettings": {
+    "write": {
+      "allowedPaths": ["src/modules/senales/**", "backend/app/services/senales/**", "backend/app/controllers/senales_controller.ts"],
+      "deniedPaths": ["node_modules/**"]
+    },
+    "shell": {
+      "allowedCommands": [
+        "node ace.*",
+        "npm run.*",
+        "cat.*",
+        "ls.*"
+      ],
+      "deniedCommands": ["rm -rf.*", "sudo.*"],
+      "autoAllowReadonly": true
+    }
+  },
+  "resources": [
+    "file://backend/app/services/senales/**/*.ts",
+    "file://backend/app/services/market/**/*.ts",
+    "file://src/modules/senales/**/*",
+    "skill://.kiro/skills/senales/SKILL.md",
+    "skill://.kiro/skills/analisis-tecnico/SKILL.md",
+    "skill://.kiro/skills/massive-api/SKILL.md"
+  ],
+  "hooks": {
+    "agentSpawn": [
+      {
+        "command": "echo '🎯 Agente Señales de Trading activo — Confluencia multi-indicador | Filtros: ADX>25, Sesión activa, Spread bajo'"
+      }
+    ]
+  },
+  "keyboardShortcut": "ctrl+shift+s",
+  "welcomeMessage": "🎯 Agente de Señales listo. Genero y evalúo señales de entrada con confluencia multi-indicador y validación de condiciones de mercado."
+}

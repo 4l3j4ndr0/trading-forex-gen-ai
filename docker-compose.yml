@@ -1,0 +1,14 @@
+services:
+  # PostgreSQL: usamos la instancia existente en puerto 5432 (sigfad_db)
+  # BD: forex_trading / User: forex_user / Pass: forex_pass_dev
+
+  redis:
+    image: redis:7-alpine
+    container_name: forex-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
