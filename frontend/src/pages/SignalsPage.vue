@@ -266,34 +266,48 @@
           <q-card-section class="q-pb-sm">
             <div class="row items-center justify-between">
               <div class="row items-center q-gutter-sm">
-                <q-badge
+                <q-icon
+                  :name="analysis.status === 'completed' ? 'check_circle' : 'error'"
                   :color="analysis.status === 'completed' ? 'positive' : 'negative'"
-                  :label="analysis.status"
+                  size="20px"
                 />
                 <span class="text-subtitle2 text-weight-bold">{{ analysis.pair_symbol }}</span>
-                <q-badge outline color="grey-7">
+                <q-badge outline color="grey-7" class="text-capitalize">
                   {{ analysis.trigger_type }}
                 </q-badge>
+                <q-badge color="blue-1" text-color="blue-9">
+                  {{ analysis.timeframe_primary }}
+                </q-badge>
               </div>
-              <div class="text-caption text-grey-6">
-                {{ formatDate(analysis.created_at) }} · {{ ((analysis.duration_ms ?? 0) / 1000).toFixed(1) }}s
+              <div class="row items-center q-gutter-xs">
+                <q-badge v-if="analysis.duration_ms" outline color="grey-6">
+                  ⏱️ {{ ((analysis.duration_ms) / 1000).toFixed(1) }}s
+                </q-badge>
+                <span class="text-caption text-grey-6">
+                  {{ formatDate(analysis.created_at) }}
+                </span>
               </div>
             </div>
           </q-card-section>
 
-          <q-card-section class="q-pt-none">
-            <q-expansion-item
-              dense
-              label="Ver análisis completo"
-              icon="description"
-              header-class="text-primary text-caption"
-            >
-              <div class="analysis-output q-pa-sm">
-                <pre class="text-body2">{{ parseAnalysisSummary(analysis.summary) }}</pre>
-              </div>
-            </q-expansion-item>
+          <q-separator />
+
+          <q-card-section class="q-pt-md analysis-markdown-content">
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div v-html="renderMarkdown(analysis.ai_reasoning)"></div>
           </q-card-section>
         </q-card>
+      </div>
+
+      <!-- Paginación -->
+      <div v-if="analysesTotal > analysesLimit" class="row justify-center q-mt-lg">
+        <q-pagination
+          v-model="analysesPage"
+          :max="Math.ceil(analysesTotal / analysesLimit)"
+          direction-links
+          boundary-links
+          color="primary"
+        />
       </div>
     </div>
   </q-page>
@@ -304,6 +318,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
+import { marked } from 'marked'
 
 const $q = useQuasar()
 const authStore = useAuthStore()
@@ -366,7 +381,7 @@ interface AnalysisRecord {
   pair_symbol: string
   trigger_type: string
   timeframe_primary: string
-  summary: string | null
+  ai_reasoning: string | null
   status: string
   duration_ms: number | null
   created_at: string
@@ -374,6 +389,9 @@ interface AnalysisRecord {
 
 const analyses = ref<AnalysisRecord[]>([])
 const loadingAnalyses = ref(false)
+const analysesPage = ref(1)
+const analysesTotal = ref(0)
+const analysesLimit = 5
 
 const filterOptions = [
   { label: 'Todas', value: 'all' },
@@ -467,8 +485,12 @@ async function loadSignals() {
 async function loadAnalyses() {
   loadingAnalyses.value = true
   try {
-    const res = await api.get<{ data: AnalysisRecord[]; meta: unknown }>('/analyses')
+    const res = await api.get<{ data: AnalysisRecord[]; meta: { total: number } }>('/analyses', {
+      page: analysesPage.value,
+      limit: analysesLimit,
+    })
     analyses.value = res.data ?? []
+    analysesTotal.value = res.meta?.total ?? 0
   } catch {
     // Silencioso
   } finally {
@@ -476,16 +498,16 @@ async function loadAnalyses() {
   }
 }
 
-function parseAnalysisSummary(summary: string | null): string {
-  if (!summary) return 'Sin datos'
+function renderMarkdown(summary: string | null): string {
+  if (!summary) return '<p class="text-grey-5">Sin datos de análisis</p>'
   try {
-    const parsed = JSON.parse(summary) as { content?: Array<{ text?: string }> }
-    if (parsed.content?.[0]?.text) {
-      return parsed.content[0].text
-    }
-    return summary
+    // El summary viene como JSON del agente: {"role":"assistant","content":[{"text":"..."}]}
+    const parsed = JSON.parse(summary) as { content?: Array<{ text?: string }>; role?: string }
+    const text = parsed.content?.[0]?.text ?? summary
+    return marked.parse(text) as string
   } catch {
-    return summary
+    // Si no es JSON, intentar renderizar directamente como markdown
+    return marked.parse(summary) as string
   }
 }
 
@@ -518,6 +540,7 @@ watch(activeTab, (tab) => {
     void loadAnalyses()
   }
 })
+watch(analysesPage, () => void loadAnalyses())
 
 onMounted(() => {
   buildPairOptions()
@@ -560,5 +583,78 @@ onMounted(() => {
 
 .analysis-history-card {
   border-radius: 12px;
+}
+
+/* Markdown rendered content */
+.analysis-markdown-content :deep(h1) {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color: #1e293b;
+}
+.analysis-markdown-content :deep(h2) {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  color: #334155;
+}
+.analysis-markdown-content :deep(h3) {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 12px 0 6px 0;
+  color: #475569;
+}
+.analysis-markdown-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.85rem;
+}
+.analysis-markdown-content :deep(th) {
+  background: #f1f5f9;
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid #e2e8f0;
+}
+.analysis-markdown-content :deep(td) {
+  padding: 6px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.analysis-markdown-content :deep(tr:hover td) {
+  background: #f8fafc;
+}
+.analysis-markdown-content :deep(code) {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
+.analysis-markdown-content :deep(p) {
+  margin: 6px 0;
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+.analysis-markdown-content :deep(strong) {
+  color: #1e293b;
+}
+.analysis-markdown-content :deep(hr) {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 16px 0;
+}
+.analysis-markdown-content :deep(ul),
+.analysis-markdown-content :deep(ol) {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+.analysis-markdown-content :deep(li) {
+  margin: 4px 0;
+  font-size: 0.9rem;
 }
 </style>

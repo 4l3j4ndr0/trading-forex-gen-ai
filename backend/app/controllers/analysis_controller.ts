@@ -70,14 +70,26 @@ export default class AnalysisController {
       })
 
       // Guardar análisis en BD
+      const responseText = result.response
+      // Extraer texto limpio del JSON del agente si aplica
+      let cleanText = responseText
+      try {
+        const parsed = JSON.parse(responseText) as { content?: Array<{ text?: string }> }
+        if (parsed.content?.[0]?.text) {
+          cleanText = parsed.content[0].text
+        }
+      } catch {
+        // No es JSON, usar tal cual
+      }
+
       await db.insertQuery().table('analyses').insert({
         pair_id: pair.id,
         user_id: cognito.user.id,
         trigger_type: 'manual',
         timeframe_primary: 'H1',
         timeframes_analyzed: JSON.stringify(['D1', 'H4', 'H1']),
-        summary: result.response.slice(0, 2000),
-        ai_reasoning: result.response,
+        summary: cleanText.slice(0, 2000),
+        ai_reasoning: cleanText,
         status: result.success ? 'completed' : 'failed',
         executed_at: new Date(),
         duration_ms: result.durationMs,
@@ -140,7 +152,7 @@ export default class AnalysisController {
         'analyses.id',
         'analyses.trigger_type',
         'analyses.timeframe_primary',
-        'analyses.summary',
+        'analyses.ai_reasoning',
         'analyses.status',
         'analyses.duration_ms',
         'analyses.created_at',
