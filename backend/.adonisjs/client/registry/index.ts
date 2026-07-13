@@ -24,6 +24,12 @@ const routes = {
     tokens: [{"old":"/api/v1/analysis/run","type":0,"val":"api","end":""},{"old":"/api/v1/analysis/run","type":0,"val":"v1","end":""},{"old":"/api/v1/analysis/run","type":0,"val":"analysis","end":""},{"old":"/api/v1/analysis/run","type":0,"val":"run","end":""}],
     types: placeholder as Registry['analysis.run']['types'],
   },
+  'analysis.analyses': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/analyses',
+    tokens: [{"old":"/api/v1/analyses","type":0,"val":"api","end":""},{"old":"/api/v1/analyses","type":0,"val":"v1","end":""},{"old":"/api/v1/analyses","type":0,"val":"analyses","end":""}],
+    types: placeholder as Registry['analysis.analyses']['types'],
+  },
   'analysis.signals': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/signals',

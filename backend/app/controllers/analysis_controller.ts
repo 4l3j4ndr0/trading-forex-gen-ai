@@ -124,6 +124,48 @@ export default class AnalysisController {
   }
 
   /**
+   * GET /api/v1/analyses
+   * Historial de análisis del usuario
+   */
+  async analyses({ cognito, request, response }: HttpContext) {
+    const { page = 1, limit = 10 } = request.qs()
+
+    const offset = (Number(page) - 1) * Number(limit)
+
+    const analyses = await db
+      .from('analyses')
+      .join('pairs', 'pairs.id', 'analyses.pair_id')
+      .where('analyses.user_id', cognito.user.id)
+      .select(
+        'analyses.id',
+        'analyses.trigger_type',
+        'analyses.timeframe_primary',
+        'analyses.summary',
+        'analyses.status',
+        'analyses.duration_ms',
+        'analyses.created_at',
+        'pairs.symbol as pair_symbol'
+      )
+      .orderBy('analyses.created_at', 'desc')
+      .offset(offset)
+      .limit(Number(limit))
+
+    const countResult = await db
+      .from('analyses')
+      .where('user_id', cognito.user.id)
+      .count('* as total')
+
+    return response.ok({
+      data: analyses,
+      meta: {
+        total: Number(countResult[0]?.total ?? 0),
+        page: Number(page),
+        limit: Number(limit),
+      },
+    })
+  }
+
+  /**
    * GET /api/v1/signals
    * Lista las señales del usuario
    */

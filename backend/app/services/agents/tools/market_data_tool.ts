@@ -56,27 +56,27 @@ export const marketDataTool = tool({
     const ticker = toMassiveTicker(symbol)
     const { multiplier, timespan } = getTimeframeParams(timeframe)
 
-    // Calcular rango de fechas
+    // Calcular rango de fechas — usar "to" como hoy y "from" basado en el timeframe
     const to = new Date()
     const from = new Date()
 
-    // Estimar cuánto tiempo atrás necesitamos según el timeframe
-    const minutesPerBar: Record<string, number> = {
-      M5: 5,
-      M15: 15,
-      H1: 60,
-      H4: 240,
-      D1: 1440,
+    // Días hacia atrás según timeframe (considerando mercado 24/5, gaps de fines de semana)
+    const daysBack: Record<string, number> = {
+      M5: 5,       // 5 días para velas de 5 min
+      M15: 14,     // 14 días para velas de 15 min
+      H1: 21,      // 21 días para velas de 1 hora (~120 velas hábiles)
+      H4: 60,      // 60 días para velas de 4 horas (~120 velas hábiles)
+      D1: 200,     // 200 días para velas diarias
     }
-    const totalMinutes = (minutesPerBar[timeframe] ?? 60) * bars * 1.5 // 1.5x para gaps de mercado
-    from.setMinutes(from.getMinutes() - totalMinutes)
+    from.setDate(from.getDate() - (daysBack[timeframe] ?? 10))
 
     const fromStr = from.toISOString().split('T')[0]
     const toStr = to.toISOString().split('T')[0]
 
-    const url = `${MASSIVE_BASE_URL}/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=${bars}&apiKey=${MASSIVE_API_KEY}`
+    const url = `${MASSIVE_BASE_URL}/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=5000&apiKey=${MASSIVE_API_KEY}`
 
     try {
+      console.log(`[MarketData] Fetching ${symbol} ${timeframe} (${fromStr} → ${toStr}, limit=${bars})`)
       const response = await fetch(url)
 
       if (!response.ok) {
@@ -92,7 +92,10 @@ export const marketDataTool = tool({
         return `No hay datos disponibles para ${symbol} en timeframe ${timeframe}`
       }
 
-      const candles: OHLCBar[] = data.results.map((r) => ({
+      // Tomar las últimas N velas (ya vienen en orden cronológico asc)
+      const recentResults = data.results.slice(-bars)
+
+      const candles: OHLCBar[] = recentResults.map((r) => ({
         open: r.o,
         high: r.h,
         low: r.l,
@@ -103,6 +106,8 @@ export const marketDataTool = tool({
 
       const latest = candles[candles.length - 1]!
       const first = candles[0]!
+
+      console.log(`[MarketData] ✅ ${symbol} ${timeframe}: ${candles.length} velas, precio actual: ${latest.close}, rango: ${new Date(first.timestamp).toISOString().split('T')[0]} → ${new Date(latest.timestamp).toISOString().split('T')[0]}`)
 
       return JSON.stringify({
         symbol,

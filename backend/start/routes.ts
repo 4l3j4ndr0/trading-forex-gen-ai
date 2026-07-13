@@ -28,4 +28,5 @@ router.put('/api/v1/me/settings', [MeController, 'updateSettings']).use(middlewa
 
 // Análisis y Señales
 router.post('/api/v1/analysis/run', [AnalysisController, 'run']).use(middleware.cognito())
+router.get('/api/v1/analyses', [AnalysisController, 'analyses']).use(middleware.cognito())
 router.get('/api/v1/signals', [AnalysisController, 'signals']).use(middleware.cognito())

@@ -120,19 +120,28 @@
     <!-- Lista de Señales -->
     <div class="row items-center q-mb-md">
       <div class="col">
-        <div class="text-subtitle1 text-weight-bold">Señales Generadas</div>
+        <q-tabs v-model="activeTab" dense no-caps class="text-grey-7" active-color="primary" indicator-color="primary" align="left">
+          <q-tab name="signals" label="Señales Generadas" icon="gps_fixed" />
+          <q-tab name="analyses" label="Historial de Análisis" icon="history" />
+        </q-tabs>
       </div>
-      <q-btn-toggle
-        v-model="signalFilter"
-        toggle-color="primary"
-        :options="filterOptions"
-        no-caps
-        dense
-        rounded
-        unelevated
-        size="sm"
-      />
     </div>
+
+    <!-- TAB: Señales -->
+    <div v-show="activeTab === 'signals'">
+      <div class="row items-center q-mb-md">
+        <q-space />
+        <q-btn-toggle
+          v-model="signalFilter"
+          toggle-color="primary"
+          :options="filterOptions"
+          no-caps
+          dense
+          rounded
+          unelevated
+          size="sm"
+        />
+      </div>
 
     <!-- Empty state -->
     <q-card v-if="!loadingSignals && signals.length === 0" flat class="text-center q-pa-xl" bordered>
@@ -239,6 +248,54 @@
     <div v-if="loadingSignals" class="text-center q-pa-lg">
       <q-spinner-dots size="32px" color="primary" />
     </div>
+    </div>
+
+    <!-- TAB: Historial de Análisis -->
+    <div v-show="activeTab === 'analyses'">
+      <div v-if="loadingAnalyses" class="text-center q-pa-lg">
+        <q-spinner-dots size="32px" color="primary" />
+      </div>
+
+      <div v-else-if="analyses.length === 0" class="text-center q-pa-xl">
+        <q-icon name="search_off" size="64px" color="grey-4" />
+        <div class="text-h6 text-grey-5 q-mt-md">No hay análisis ejecutados</div>
+      </div>
+
+      <div v-else class="q-gutter-md">
+        <q-card v-for="analysis in analyses" :key="analysis.id" flat bordered class="analysis-history-card">
+          <q-card-section class="q-pb-sm">
+            <div class="row items-center justify-between">
+              <div class="row items-center q-gutter-sm">
+                <q-badge
+                  :color="analysis.status === 'completed' ? 'positive' : 'negative'"
+                  :label="analysis.status"
+                />
+                <span class="text-subtitle2 text-weight-bold">{{ analysis.pair_symbol }}</span>
+                <q-badge outline color="grey-7">
+                  {{ analysis.trigger_type }}
+                </q-badge>
+              </div>
+              <div class="text-caption text-grey-6">
+                {{ formatDate(analysis.created_at) }} · {{ ((analysis.duration_ms ?? 0) / 1000).toFixed(1) }}s
+              </div>
+            </div>
+          </q-card-section>
+
+          <q-card-section class="q-pt-none">
+            <q-expansion-item
+              dense
+              label="Ver análisis completo"
+              icon="description"
+              header-class="text-primary text-caption"
+            >
+              <div class="analysis-output q-pa-sm">
+                <pre class="text-body2">{{ parseAnalysisSummary(analysis.summary) }}</pre>
+              </div>
+            </q-expansion-item>
+          </q-card-section>
+        </q-card>
+      </div>
+    </div>
   </q-page>
 </template>
 
@@ -302,6 +359,21 @@ const analysisResult = ref<{
 const signals = ref<Signal[]>([])
 const loadingSignals = ref(false)
 const signalFilter = ref('all')
+const activeTab = ref('signals')
+
+interface AnalysisRecord {
+  id: string
+  pair_symbol: string
+  trigger_type: string
+  timeframe_primary: string
+  summary: string | null
+  status: string
+  duration_ms: number | null
+  created_at: string
+}
+
+const analyses = ref<AnalysisRecord[]>([])
+const loadingAnalyses = ref(false)
 
 const filterOptions = [
   { label: 'Todas', value: 'all' },
@@ -392,6 +464,31 @@ async function loadSignals() {
   }
 }
 
+async function loadAnalyses() {
+  loadingAnalyses.value = true
+  try {
+    const res = await api.get<{ data: AnalysisRecord[]; meta: unknown }>('/analyses')
+    analyses.value = res.data ?? []
+  } catch {
+    // Silencioso
+  } finally {
+    loadingAnalyses.value = false
+  }
+}
+
+function parseAnalysisSummary(summary: string | null): string {
+  if (!summary) return 'Sin datos'
+  try {
+    const parsed = JSON.parse(summary) as { content?: Array<{ text?: string }> }
+    if (parsed.content?.[0]?.text) {
+      return parsed.content[0].text
+    }
+    return summary
+  } catch {
+    return summary
+  }
+}
+
 function statusColor(status: string): string {
   const colors: Record<string, string> = {
     pending: 'blue-grey',
@@ -416,10 +513,16 @@ function formatDate(date: string): string {
 }
 
 watch(signalFilter, () => void loadSignals())
+watch(activeTab, (tab) => {
+  if (tab === 'analyses' && analyses.value.length === 0) {
+    void loadAnalyses()
+  }
+})
 
 onMounted(() => {
   buildPairOptions()
   void loadSignals()
+  void loadAnalyses()
 })
 </script>
 
@@ -453,5 +556,9 @@ onMounted(() => {
   font-size: 13px;
   line-height: 1.6;
   margin: 0;
+}
+
+.analysis-history-card {
+  border-radius: 12px;
 }
 </style>

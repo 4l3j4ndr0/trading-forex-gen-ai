@@ -50,15 +50,19 @@ function createTechnicalAnalysisTool() {
         ),
     }),
     callback: async (input) => {
+      console.log(`[TechnicalAnalysis] Invocando para ${input.symbol}...`)
       const agent = createTechnicalAnalysisAgent()
       try {
         const result = await agent.invoke(
           `${input.instruction}\n\nPar: ${input.symbol}\nTimeframes: D1, H4, H1`
         )
-        return typeof result.lastMessage === 'string'
+        const response = typeof result.lastMessage === 'string'
           ? result.lastMessage
           : JSON.stringify(result.lastMessage)
+        console.log(`[TechnicalAnalysis] ✅ Completado (${response.length} chars)`)
+        return response
       } catch (error) {
+        console.error(`[TechnicalAnalysis] ❌ Error:`, error)
         return `Error en análisis técnico: ${error instanceof Error ? error.message : 'Unknown'}`
       }
     },
@@ -83,6 +87,7 @@ function createRiskManagementTool(settings: UserSettings) {
         ),
     }),
     callback: async (input) => {
+      console.log(`[RiskManagement] Evaluando riesgo para ${input.symbol}...`)
       const agent = createRiskManagementAgent(settings)
       try {
         const result = await agent.invoke(
@@ -120,6 +125,7 @@ function createSignalDecisionTool(settings: UserSettings, context: AnalysisConte
       riskAssessment: z.string().describe('Resultado completo de la evaluación de riesgo'),
     }),
     callback: async (input) => {
+      console.log(`[SignalDecision] Decidiendo señal...`)
       const agent = createSignalsAgent(settings)
       try {
         const result = await agent.invoke(
@@ -210,8 +216,11 @@ Decisión final de emitir la señal en la BD.
  */
 export async function runAnalysis(context: AnalysisContext): Promise<AnalysisResult> {
   const startTime = Date.now()
-  const modelId = env.get('BEDROCK_MODEL_ID', 'us.anthropic.claude-sonnet-5')
+  const modelId = env.get('BEDROCK_MODEL_ID', 'amazon.nova-pro-v1:0')
   const region = env.get('AWS_REGION', 'us-east-1')
+
+  console.log(`[Orchestrator] Iniciando análisis de ${context.symbol} con modelo ${modelId}`)
+  console.log(`[Orchestrator] Settings: score>=${context.settings.minSignalScore}, clase>=${context.settings.minSignalClass}, riesgo=${context.settings.maxRiskPerTrade}%`)
 
   const orchestrator = new Agent({
     model: new BedrockModel({ modelId, region, temperature: 0.3 }),
@@ -242,12 +251,16 @@ Ejecuta tu proceso de decisión completo.`
         ? result.lastMessage
         : JSON.stringify(result.lastMessage)
 
+    console.log(`[Orchestrator] ✅ Completado en ${Date.now() - startTime}ms`)
+    console.log(`[Orchestrator] Respuesta: ${response.slice(0, 300)}...`)
+
     return {
       success: true,
       response,
       durationMs: Date.now() - startTime,
     }
   } catch (error) {
+    console.error(`[Orchestrator] ❌ Error:`, error)
     return {
       success: false,
       response: error instanceof Error ? error.message : 'Error desconocido en el orquestador',

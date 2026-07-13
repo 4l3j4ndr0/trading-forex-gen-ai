@@ -8,6 +8,7 @@ export interface ApiDefinition {
   }
   analysis: {
     run: typeof routes['analysis.run']
+    analyses: typeof routes['analysis.analyses']
     signals: typeof routes['analysis.signals']
   }
 }

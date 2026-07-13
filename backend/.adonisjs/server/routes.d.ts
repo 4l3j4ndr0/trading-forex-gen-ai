@@ -7,14 +7,17 @@ export type ScannedRoutes = {
     'me.show': { paramsTuple?: []; params?: {} }
     'me.update_settings': { paramsTuple?: []; params?: {} }
     'analysis.run': { paramsTuple?: []; params?: {} }
+    'analysis.analyses': { paramsTuple?: []; params?: {} }
     'analysis.signals': { paramsTuple?: []; params?: {} }
   }
   GET: {
     'me.show': { paramsTuple?: []; params?: {} }
+    'analysis.analyses': { paramsTuple?: []; params?: {} }
     'analysis.signals': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
     'me.show': { paramsTuple?: []; params?: {} }
+    'analysis.analyses': { paramsTuple?: []; params?: {} }
     'analysis.signals': { paramsTuple?: []; params?: {} }
   }
   PUT: {
