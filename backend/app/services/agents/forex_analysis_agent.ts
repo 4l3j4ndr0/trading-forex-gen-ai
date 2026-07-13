@@ -1,6 +1,9 @@
+import { Agent, BedrockModel, tool } from '@strands-agents/sdk'
+import { z } from 'zod'
 import { createTechnicalAnalysisAgent } from './technical_analysis_agent.js'
 import { createRiskManagementAgent } from './risk_management_agent.js'
 import { createSignalsAgent } from './signals_agent.js'
+import env from '#start/env'
 
 export interface UserSettings {
   maxRiskPerTrade: number
@@ -25,163 +28,217 @@ export interface AnalysisContext {
 
 export interface AnalysisResult {
   success: boolean
-  technicalAnalysis: string
-  riskAssessment: string
-  signalDecision: string
+  response: string
   durationMs: number
-  steps: {
-    technical: { success: boolean; durationMs: number }
-    risk: { success: boolean; durationMs: number }
-    signal: { success: boolean; durationMs: number }
-  }
 }
 
 /**
- * Orquestador Multi-Agente — Workflow Secuencial
- *
- * Flujo: Análisis Técnico → Gestión de Riesgo → Decisión de Señal
- *
- * Cada agente recibe el output del anterior como contexto,
- * manteniendo separación de responsabilidades.
+ * Crea un tool que delega al agente de análisis técnico
  */
-export async function runAnalysis(context: AnalysisContext): Promise<AnalysisResult> {
-  const totalStart = Date.now()
+function createTechnicalAnalysisTool() {
+  return tool({
+    name: 'run_technical_analysis',
+    description:
+      'Delega al Agente de Análisis Técnico especializado. Obtiene datos OHLCV multi-temporalidad (D1, H4, H1), calcula indicadores (EMA, RSI, MACD, ATR, Bollinger) y evalúa confluencias. Usar SIEMPRE como primer paso antes de evaluar riesgo.',
+    inputSchema: z.object({
+      symbol: z.string().describe('Par de forex a analizar, ej: "EUR/USD"'),
+      instruction: z
+        .string()
+        .describe(
+          'Instrucción específica para el análisis. Ej: "Analiza D1, H4 y H1, identifica confluencias y propón niveles de entrada"'
+        ),
+    }),
+    callback: async (input) => {
+      const agent = createTechnicalAnalysisAgent()
+      try {
+        const result = await agent.invoke(
+          `${input.instruction}\n\nPar: ${input.symbol}\nTimeframes: D1, H4, H1`
+        )
+        return typeof result.lastMessage === 'string'
+          ? result.lastMessage
+          : JSON.stringify(result.lastMessage)
+      } catch (error) {
+        return `Error en análisis técnico: ${error instanceof Error ? error.message : 'Unknown'}`
+      }
+    },
+  })
+}
 
-  const steps = {
-    technical: { success: false, durationMs: 0 },
-    risk: { success: false, durationMs: 0 },
-    signal: { success: false, durationMs: 0 },
-  }
+/**
+ * Crea un tool que delega al agente de gestión de riesgo
+ */
+function createRiskManagementTool(settings: UserSettings) {
+  return tool({
+    name: 'evaluate_risk',
+    description:
+      'Delega al Agente de Gestión de Riesgo. Calcula lot size, valida R:R, verifica drawdown y correlaciones. Usar DESPUÉS del análisis técnico, pasándole los niveles propuestos.',
+    inputSchema: z.object({
+      symbol: z.string().describe('Par de forex'),
+      accountBalance: z.number().describe('Balance del trader en USD'),
+      technicalContext: z
+        .string()
+        .describe(
+          'Resultado del análisis técnico con niveles propuestos (entry, SL, TP). Pasar textualmente.'
+        ),
+    }),
+    callback: async (input) => {
+      const agent = createRiskManagementAgent(settings)
+      try {
+        const result = await agent.invoke(
+          `Evalúa el riesgo de esta operación:
 
-  // ═══════════════════════════════════════════════════════════
-  // PASO 1: Análisis Técnico Multi-Temporalidad
-  // ═══════════════════════════════════════════════════════════
-  let technicalAnalysis = ''
-  const step1Start = Date.now()
+Par: ${input.symbol}
+Balance: $${input.accountBalance}
+Riesgo máximo permitido: ${settings.maxRiskPerTrade}%
 
-  try {
-    const techAgent = createTechnicalAnalysisAgent()
-    const techResult = await techAgent.invoke(
-      `Analiza el par ${context.symbol} usando Top-Down Analysis (D1 → H4 → H1).
-      
-Obtén los datos de mercado para cada timeframe y calcula los indicadores técnicos.
-Identifica:
-- Sesgo direccional en cada temporalidad
-- Confluencias técnicas (mínimo 3 necesarias)
-- Niveles clave de entrada, stop loss y take profit
-- Score de confianza (1-10)
+Análisis técnico:
+${input.technicalContext}
 
-Si el score es menor a ${context.settings.minSignalScore}, indica que no hay oportunidad válida y explica por qué.`
-    )
+Usa calculate_risk con los niveles propuestos. Si no hay niveles claros, indica que no hay operación para validar.`
+        )
+        return typeof result.lastMessage === 'string'
+          ? result.lastMessage
+          : JSON.stringify(result.lastMessage)
+      } catch (error) {
+        return `Error en evaluación de riesgo: ${error instanceof Error ? error.message : 'Unknown'}`
+      }
+    },
+  })
+}
 
-    technicalAnalysis =
-      typeof techResult.lastMessage === 'string'
-        ? techResult.lastMessage
-        : JSON.stringify(techResult.lastMessage)
-    steps.technical = { success: true, durationMs: Date.now() - step1Start }
-  } catch (error) {
-    technicalAnalysis = `Error en análisis técnico: ${error instanceof Error ? error.message : 'Unknown'}`
-    steps.technical = { success: false, durationMs: Date.now() - step1Start }
-
-    return {
-      success: false,
-      technicalAnalysis,
-      riskAssessment: 'No ejecutado — análisis técnico falló',
-      signalDecision: 'No ejecutado',
-      durationMs: Date.now() - totalStart,
-      steps,
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // PASO 2: Validación de Riesgo
-  // ═══════════════════════════════════════════════════════════
-  let riskAssessment = ''
-  const step2Start = Date.now()
-
-  try {
-    const riskAgent = createRiskManagementAgent(context.settings)
-    const riskResult = await riskAgent.invoke(
-      `Evalúa el riesgo de esta operación basándote en el siguiente análisis técnico:
-
-${technicalAnalysis}
-
-Datos del trader:
-- Balance: $${context.accountBalance}
-- Riesgo máximo por operación: ${context.settings.maxRiskPerTrade}%
-- Par: ${context.symbol}
-
-Usa el tool calculate_risk con los niveles propuestos por el análisis técnico.
-Si el análisis no propone niveles claros (score bajo), indica que no hay operación para validar.`
-    )
-
-    riskAssessment =
-      typeof riskResult.lastMessage === 'string'
-        ? riskResult.lastMessage
-        : JSON.stringify(riskResult.lastMessage)
-    steps.risk = { success: true, durationMs: Date.now() - step2Start }
-  } catch (error) {
-    riskAssessment = `Error en evaluación de riesgo: ${error instanceof Error ? error.message : 'Unknown'}`
-    steps.risk = { success: false, durationMs: Date.now() - step2Start }
-
-    return {
-      success: false,
-      technicalAnalysis,
-      riskAssessment,
-      signalDecision: 'No ejecutado — evaluación de riesgo falló',
-      durationMs: Date.now() - totalStart,
-      steps,
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // PASO 3: Decisión de Señal
-  // ═══════════════════════════════════════════════════════════
-  let signalDecision = ''
-  const step3Start = Date.now()
-
-  try {
-    const signalsAgent = createSignalsAgent(context.settings)
-    const signalResult = await signalsAgent.invoke(
-      `Toma la decisión final sobre emitir o no una señal de trading.
+/**
+ * Crea un tool que delega al agente de señales
+ */
+function createSignalDecisionTool(settings: UserSettings, context: AnalysisContext) {
+  return tool({
+    name: 'decide_signal',
+    description:
+      'Delega al Agente de Señales para la decisión FINAL. Decide si emitir o rechazar la señal basándose en el análisis técnico + validación de riesgo. Si emite, guarda en BD. Usar SOLO después de technical_analysis y evaluate_risk.',
+    inputSchema: z.object({
+      technicalAnalysis: z.string().describe('Resultado completo del análisis técnico'),
+      riskAssessment: z.string().describe('Resultado completo de la evaluación de riesgo'),
+    }),
+    callback: async (input) => {
+      const agent = createSignalsAgent(settings)
+      try {
+        const result = await agent.invoke(
+          `Toma la decisión final sobre emitir o no una señal.
 
 ## Análisis Técnico:
-${technicalAnalysis}
+${input.technicalAnalysis}
 
 ## Evaluación de Riesgo:
-${riskAssessment}
+${input.riskAssessment}
 
 ## Contexto:
 - User ID: ${context.userId}
 - Pair ID: ${context.pairId}
 - Par: ${context.symbol}
 - Balance: $${context.accountBalance}
-- Score mínimo requerido: ${context.settings.minSignalScore}/10
-- Clasificación mínima: Clase ${context.settings.minSignalClass}
+- Score mínimo: ${settings.minSignalScore}/10
+- Clasificación mínima: Clase ${settings.minSignalClass}
 
-Si el análisis muestra una oportunidad válida Y el riesgo está validado:
-→ Usa emit_signal con todos los datos
+Si todo cuadra → usa emit_signal
+Si no → explica por qué y cuándo re-evaluar`
+        )
+        return typeof result.lastMessage === 'string'
+          ? result.lastMessage
+          : JSON.stringify(result.lastMessage)
+      } catch (error) {
+        return `Error en decisión de señal: ${error instanceof Error ? error.message : 'Unknown'}`
+      }
+    },
+  })
+}
 
-Si NO hay oportunidad válida:
-→ Explica por qué y qué debería cambiar para generar señal`
+function buildOrchestratorPrompt(settings: UserSettings): string {
+  return `Eres el Agente Orquestador del Sistema de Trading Forex con IA. Tu rol es coordinar el análisis de un par de divisas delegando a agentes especializados y tomando decisiones inteligentes sobre el flujo.
+
+## Tu Equipo de Agentes:
+1. **run_technical_analysis** — Análisis técnico multi-temporalidad (D1→H4→H1)
+2. **evaluate_risk** — Validación de riesgo y cálculo de posición
+3. **decide_signal** — Decisión final de emitir/rechazar señal
+
+## Configuración del Trader:
+- Riesgo máximo: ${settings.maxRiskPerTrade}%
+- Drawdown diario: ${settings.maxDailyDrawdown}%
+- Drawdown semanal: ${settings.maxWeeklyDrawdown}%
+- Posiciones simultáneas: ${settings.maxOpenPositions}
+- Score mínimo: ${settings.minSignalScore}/10
+- Clasificación mínima: Clase ${settings.minSignalClass}
+- Sesiones: ${settings.preferredSessions.join(', ')}
+- Zona horaria: ${settings.timezone}
+
+## Tu Proceso de Decisión:
+
+### SIEMPRE empezar con run_technical_analysis
+Pide análisis completo Top-Down del par.
+
+### Evaluar resultado del análisis técnico:
+- Si el análisis indica score < ${settings.minSignalScore} o no hay confluencias suficientes → **DETENER**. No invocar risk ni signal. Reportar directamente al usuario que no hay oportunidad y por qué.
+- Si el análisis indica oportunidad potencial (score >= ${settings.minSignalScore}, confluencias >= 3) → continuar con evaluate_risk.
+
+### Evaluar resultado del riesgo:
+- Si el riesgo es rechazado (semáforo rojo, R:R < 1:2, etc.) → **DETENER**. No invocar signal. Reportar que el setup no cumple criterios de riesgo.
+- Si el riesgo es aceptable → continuar con decide_signal.
+
+### Resultado final:
+- Si se emitió señal → confirmar al usuario con resumen
+- Si no se emitió → explicar claramente por qué y qué vigilar
+
+## Reglas:
+- SÉ EFICIENTE: Si el primer paso ya muestra que no hay oportunidad, NO gastes tokens invocando los demás agentes.
+- SÉ CLARO: Tu respuesta final al usuario debe ser un resumen ejecutivo legible, no JSON crudo.
+- RESPETA los parámetros del trader — nunca sugieras operar fuera de sus límites.
+- Incluye siempre: par analizado, timeframes, dirección del mercado, y si hay o no señal.`
+}
+
+/**
+ * Ejecuta el análisis con el agente orquestador inteligente
+ */
+export async function runAnalysis(context: AnalysisContext): Promise<AnalysisResult> {
+  const startTime = Date.now()
+  const modelId = env.get('BEDROCK_MODEL_ID', 'us.anthropic.claude-sonnet-5')
+  const region = env.get('AWS_REGION', 'us-east-1')
+
+  const orchestrator = new Agent({
+    model: new BedrockModel({ modelId, region, temperature: 0.3 }),
+    tools: [
+      createTechnicalAnalysisTool(),
+      createRiskManagementTool(context.settings),
+      createSignalDecisionTool(context.settings, context),
+    ],
+    systemPrompt: buildOrchestratorPrompt(context.settings),
+    printer: false,
+  })
+
+  try {
+    const result = await orchestrator.invoke(
+      `Analiza el par ${context.symbol} y determina si hay una oportunidad de trading válida para este trader.
+
+Datos:
+- Balance: $${context.accountBalance}
+- Trigger: ${context.triggerType}
+- Hora actual UTC: ${new Date().toISOString()}
+
+Ejecuta tu proceso de decisión completo.`
     )
 
-    signalDecision =
-      typeof signalResult.lastMessage === 'string'
-        ? signalResult.lastMessage
-        : JSON.stringify(signalResult.lastMessage)
-    steps.signal = { success: true, durationMs: Date.now() - step3Start }
-  } catch (error) {
-    signalDecision = `Error en decisión de señal: ${error instanceof Error ? error.message : 'Unknown'}`
-    steps.signal = { success: false, durationMs: Date.now() - step3Start }
-  }
+    const response =
+      typeof result.lastMessage === 'string'
+        ? result.lastMessage
+        : JSON.stringify(result.lastMessage)
 
-  return {
-    success: steps.technical.success && steps.risk.success && steps.signal.success,
-    technicalAnalysis,
-    riskAssessment,
-    signalDecision,
-    durationMs: Date.now() - totalStart,
-    steps,
+    return {
+      success: true,
+      response,
+      durationMs: Date.now() - startTime,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      response: error instanceof Error ? error.message : 'Error desconocido en el orquestador',
+      durationMs: Date.now() - startTime,
+    }
   }
 }

@@ -6,7 +6,7 @@ import type { UserSettings } from '#services/agents/forex_analysis_agent'
 export default class AnalysisController {
   /**
    * POST /api/v1/analysis/run
-   * Ejecuta un análisis manual para un par específico
+   * Ejecuta un análisis manual para un par específico usando el orquestador multi-agente
    */
   async run({ cognito, request, response }: HttpContext) {
     const { symbol } = request.only(['symbol'])
@@ -59,7 +59,7 @@ export default class AnalysisController {
       .returning('id')
 
     try {
-      // Ejecutar el workflow multi-agente con los settings del usuario
+      // Ejecutar el orquestador multi-agente
       const result = await runAnalysis({
         userId: cognito.user.id,
         pairId: pair.id as number,
@@ -76,24 +76,20 @@ export default class AnalysisController {
         trigger_type: 'manual',
         timeframe_primary: 'H1',
         timeframes_analyzed: JSON.stringify(['D1', 'H4', 'H1']),
-        summary: result.signalDecision.slice(0, 2000),
-        ai_reasoning: JSON.stringify({
-          technical: result.technicalAnalysis.slice(0, 5000),
-          risk: result.riskAssessment.slice(0, 3000),
-          signal: result.signalDecision.slice(0, 3000),
-        }),
+        summary: result.response.slice(0, 2000),
+        ai_reasoning: result.response,
         status: result.success ? 'completed' : 'failed',
         executed_at: new Date(),
         duration_ms: result.durationMs,
         created_at: new Date(),
       })
 
-      // Contar señales generadas en este análisis
+      // Contar señales generadas
       const signalsCount = await db
         .from('signals')
         .where('user_id', cognito.user.id)
         .where('pair_id', pair.id as number)
-        .where('created_at', '>=', new Date(Date.now() - 60000))
+        .where('created_at', '>=', new Date(Date.now() - 120000)) // últimos 2 minutos
         .count('* as total')
 
       const totalSignals = Number(signalsCount[0]?.total ?? 0)
@@ -108,13 +104,8 @@ export default class AnalysisController {
       return response.ok({
         data: {
           success: result.success,
-          analysis: {
-            technical: result.technicalAnalysis,
-            risk: result.riskAssessment,
-            signal: result.signalDecision,
-          },
+          analysis: result.response,
           durationMs: result.durationMs,
-          steps: result.steps,
           signalsGenerated: totalSignals,
         },
       })
