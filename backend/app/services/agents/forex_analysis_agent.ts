@@ -40,7 +40,7 @@ function createTechnicalAnalysisTool() {
   return tool({
     name: 'run_technical_analysis',
     description:
-      'Delega al Agente de Análisis Técnico especializado. Obtiene datos OHLCV multi-temporalidad (D1, H4, H1), calcula indicadores (EMA, RSI, MACD, ATR, Bollinger) y evalúa confluencias. Usar SIEMPRE como primer paso antes de evaluar riesgo.',
+      'Delega al Agente de Análisis Técnico especializado. Obtiene datos EN TIEMPO REAL de TradingView multi-temporalidad (D1, H4, H1) con 30+ indicadores (EMA, RSI, MACD, ATR, Bollinger, ADX, Stochastic, Pivots) y recomendación BUY/SELL. Usar SIEMPRE como segundo paso después de check_news_impact.',
     inputSchema: z.object({
       symbol: z.string().describe('Par de forex a analizar, ej: "EUR/USD"'),
       instruction: z

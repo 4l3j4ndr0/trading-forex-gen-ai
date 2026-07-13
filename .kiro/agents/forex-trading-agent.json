@@ -25,7 +25,12 @@
         "ls.*",
         "curl.*api.*"
       ],
-      "deniedCommands": ["rm -rf.*", "sudo.*", "git push --force.*", "git reset --hard.*"],
+      "deniedCommands": [
+        "rm -rf.*",
+        "sudo.*",
+        "git push --force.*",
+        "git reset --hard.*"
+      ],
       "autoAllowReadonly": true
     }
   },

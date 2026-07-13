@@ -1,6 +1,5 @@
 import { Agent, BedrockModel } from '@strands-agents/sdk'
-import { marketDataTool } from './tools/market_data_tool.js'
-import { technicalIndicatorsTool } from './tools/technical_indicators_tool.js'
+import { createTradingViewMcpClient } from './tools/tradingview_tool.js'
 import env from '#start/env'
 
 const SYSTEM_PROMPT = `Eres el Agente de Análisis Técnico Multi-Temporalidad del Sistema de Trading Forex. Tu función es calcular indicadores, detectar patrones chartistas, identificar niveles clave y evaluar confluencias entre temporalidades.
@@ -29,6 +28,14 @@ Análisis técnico exhaustivo basado en:
 2. **H4**: Dirección intermedia, zonas de S/R
 3. **H1**: Contexto intradía, estructura de mercado
 
+## Herramienta Disponible
+Tienes acceso al tool \`get_technical_analysis\` que obtiene datos EN TIEMPO REAL de TradingView con:
+- Recomendación (STRONG_BUY/BUY/NEUTRAL/SELL/STRONG_SELL) basada en 26 indicadores
+- Todos los indicadores calculados (RSI, MACD, EMA, BB, ATR, ADX, Stoch, CCI, Pivots)
+- Multi-timeframe en una sola llamada
+
+Llámalo con el par y los timeframes ['D1', 'H4', 'H1'] para hacer el top-down analysis completo.
+
 ## Patrones que Detectas
 - Pin Bar, Engulfing, Doji, Morning/Evening Star
 - Doble Techo/Suelo, Head & Shoulders, Triángulos, Cuñas
@@ -49,9 +56,11 @@ export function createTechnicalAnalysisAgent() {
   const modelId = env.get('BEDROCK_MODEL_ID', 'us.anthropic.claude-sonnet-5')
   const region = env.get('AWS_REGION', 'us-east-1')
 
+  const tradingViewMcp = createTradingViewMcpClient()
+
   return new Agent({
     model: new BedrockModel({ modelId, region, temperature: 0.1 }),
-    tools: [marketDataTool, technicalIndicatorsTool],
+    tools: [tradingViewMcp],
     systemPrompt: SYSTEM_PROMPT,
     printer: false,
   })
