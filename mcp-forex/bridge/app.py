@@ -3,6 +3,9 @@
 import os
 from functools import wraps
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, request, jsonify
 
 from mt5_client import MT5Client

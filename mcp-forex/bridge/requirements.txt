@@ -1,3 +1,5 @@
 flask==3.1.1
 waitress==3.0.2
 MetaTrader5==5.0.4200
+python-dotenv==1.1.1
+numpy<2
