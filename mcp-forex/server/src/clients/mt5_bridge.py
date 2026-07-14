@@ -5,21 +5,13 @@ import requests
 
 MT5_BRIDGE_URL = os.getenv("MT5_BRIDGE_URL", "http://mt5-bridge.awslearn.cloud:5000")
 MT5_BRIDGE_API_KEY = os.getenv("MT5_BRIDGE_API_KEY", "")
-
-# User ID set per-request (from MCP context or env for testing)
-_current_user_id = os.getenv("DEFAULT_USER_ID", "")
-
-
-def set_user_id(user_id: str):
-    """Set the current user ID for bridge requests."""
-    global _current_user_id
-    _current_user_id = user_id
+USER_ID = os.getenv("USER_ID", "")
 
 
 def _headers():
     return {
         "X-Bridge-Api-Key": MT5_BRIDGE_API_KEY,
-        "X-User-Id": _current_user_id,
+        "X-User-Id": USER_ID,
         "Content-Type": "application/json",
     }
 

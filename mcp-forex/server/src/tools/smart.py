@@ -1,24 +1,19 @@
 """Smart tools — business logic for position sizing, validation, and SL/TP."""
 
+import os
 import json
 from datetime import datetime, timezone
 
 from src.core.db import execute, execute_one
 from src.clients.tradingview import get_analysis
 
-
-def _get_setting(key: str, default: str = "0") -> str:
-    """Get a setting value from DB."""
-    row = execute_one("SELECT value FROM trading_settings WHERE key = %s", (key,))
-    return row["value"] if row else default
+USER_ID = os.getenv("USER_ID", "")
 
 
-def _get_setting_float(key: str, default: float = 0.0) -> float:
-    return float(_get_setting(key, str(default)))
-
-
-def _get_setting_int(key: str, default: int = 0) -> int:
-    return int(_get_setting(key, str(default)))
+def _get_settings() -> dict:
+    """Get trading settings for the current user."""
+    row = execute_one("SELECT * FROM trading_settings WHERE user_id = %s", (USER_ID,))
+    return row or {}
 
 
 def register_smart_tools(mcp):
@@ -39,9 +34,11 @@ def register_smart_tools(mcp):
             Calculated lot size, risk in USD, and validation.
         """
         if risk_pct is None:
-            risk_pct = _get_setting_float("max_risk_per_trade_pct", 1.0)
+            s = _get_settings()
+            risk_pct = float(s.get("max_risk_per_trade_pct", 1.0))
 
-        max_lot = _get_setting_float("max_lot_size", 0.50)
+        s = _get_settings()
+        max_lot = float(s.get("max_lot_size", 0.50))
 
         # Get current price to calculate pip value dynamically
         from src.clients.tradingview import get_analysis
@@ -79,7 +76,9 @@ def register_smart_tools(mcp):
             pip_value = pip_size * 100000 / close if close > 2 else pip_size * 100000
 
         # Use min_balance as estimate (in production, comes from MT5)
-        balance = _get_setting_float("min_balance_usd", 10000.0)
+        from src.clients.mt5_bridge import bridge
+        account = bridge.get_account()
+        balance = account.get("balance", 10000) if "error" not in account else float(s.get("min_balance_usd", 10000))
 
         # Calculate
         risk_usd = balance * risk_pct / 100
@@ -124,30 +123,34 @@ def register_smart_tools(mcp):
             Target USD, current PnL, progress percentage, and recommendation.
         """
         today = datetime.now(timezone.utc).date()
-        target_pct = _get_setting_float("daily_target_pct", 1.0)
-        balance = _get_setting_float("min_balance_usd", 10000.0)
-        max_daily_loss_pct = _get_setting_float("max_daily_loss_pct", 1.0)
-        reduce_at = _get_setting_float("reduce_lot_at_pct", 80.0)
+        s = _get_settings()
+        target_pct = float(s.get("daily_target_pct", 1.0))
+        max_daily_loss_pct = float(s.get("max_daily_loss_pct", 1.0))
+        reduce_at = float(s.get("reduce_lot_at_pct", 80.0))
+
+        # Get live balance
+        from src.clients.mt5_bridge import bridge
+        account = bridge.get_account()
+        balance = account.get("balance", 10000) if "error" not in account else 10000
 
         target_usd = balance * target_pct / 100
         max_loss_usd = balance * max_daily_loss_pct / 100
 
         # Realized PnL today
         daily_rows = execute(
-            "SELECT COALESCE(SUM(pnl_usd), 0) as total, COUNT(*) as cnt FROM trades WHERE status = 'closed' AND closed_at::date = %s",
-            (today,)
+            "SELECT COALESCE(SUM(pnl_usd), 0) as total, COUNT(*) as cnt FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at::date = %s",
+            (USER_ID, today)
         )
         realized_pnl = float(daily_rows[0]["total"]) if daily_rows else 0
         trades_today = int(daily_rows[0]["cnt"]) if daily_rows else 0
 
-        # Wins/losses today
         wins = execute_one(
-            "SELECT COUNT(*) as cnt FROM trades WHERE status = 'closed' AND closed_at::date = %s AND pnl_usd > 0",
-            (today,)
+            "SELECT COUNT(*) as cnt FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at::date = %s AND pnl_usd > 0",
+            (USER_ID, today)
         )
         losses = execute_one(
-            "SELECT COUNT(*) as cnt FROM trades WHERE status = 'closed' AND closed_at::date = %s AND pnl_usd <= 0",
-            (today,)
+            "SELECT COUNT(*) as cnt FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at::date = %s AND pnl_usd <= 0",
+            (USER_ID, today)
         )
 
         progress_pct = round(realized_pnl / target_usd * 100, 1) if target_usd > 0 else 0
@@ -190,13 +193,14 @@ def register_smart_tools(mcp):
         now = datetime.now(timezone.utc)
         hour = now.hour
         today = now.date()
+        s = _get_settings()
 
         checks = {}
         warnings = []
         blocked_reasons = []
 
         # 1. Kill switch
-        kill_switch = _get_setting("kill_switch", "false") == "true"
+        kill_switch = s.get("kill_switch", False)
         checks["kill_switch_off"] = {
             "pass": not kill_switch,
             "detail": "Kill switch: OFF" if not kill_switch else "Kill switch: ON — all trading blocked",
@@ -205,19 +209,17 @@ def register_smart_tools(mcp):
             blocked_reasons.append("Kill switch is ON")
 
         # 2. Trading hours
-        start_str = _get_setting("trading_start_utc", "07:00")
-        end_str = _get_setting("trading_end_utc", "21:00")
-        start_hour = int(start_str.split(":")[0])
-        end_hour = int(end_str.split(":")[0])
+        start_hour = int(str(s.get("trading_start_utc", "07:00")).split(":")[0])
+        end_hour = int(str(s.get("trading_end_utc", "21:00")).split(":")[0])
         in_hours = start_hour <= hour < end_hour
         checks["session_active"] = {
             "pass": in_hours,
-            "detail": f"Trading hours: {start_str}-{end_str} UTC. Current: {hour:02d}:00",
+            "detail": f"Trading hours: {start_hour:02d}:00-{end_hour:02d}:00 UTC. Current: {hour:02d}:00",
         }
         if not in_hours:
-            blocked_reasons.append(f"Outside trading hours ({start_str}-{end_str} UTC)")
+            blocked_reasons.append(f"Outside trading hours ({start_hour:02d}:00-{end_hour:02d}:00 UTC)")
 
-        # 3. Session info
+        # 3. Sessions
         sessions = []
         if 7 <= hour < 16:
             sessions.append("london")
@@ -227,16 +229,18 @@ def register_smart_tools(mcp):
             sessions.append("tokyo")
 
         if in_hours and hour >= end_hour - 1:
-            warnings.append(f"Trading window ends in <1 hour. Consider smaller positions.")
+            warnings.append("Trading window ends in <1 hour. Consider smaller positions.")
 
         # 4. Daily loss check
-        balance = _get_setting_float("min_balance_usd", 10000.0)
-        max_loss_pct = _get_setting_float("max_daily_loss_pct", 1.0)
+        from src.clients.mt5_bridge import bridge
+        account = bridge.get_account()
+        balance = account.get("balance", 10000) if "error" not in account else 10000
+        max_loss_pct = float(s.get("max_daily_loss_pct", 1.0))
         max_loss_usd = balance * max_loss_pct / 100
 
         daily_rows = execute(
-            "SELECT COALESCE(SUM(pnl_usd), 0) as total FROM trades WHERE status = 'closed' AND closed_at::date = %s",
-            (today,)
+            "SELECT COALESCE(SUM(pnl_usd), 0) as total FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at::date = %s",
+            (USER_ID, today)
         )
         daily_pnl = float(daily_rows[0]["total"]) if daily_rows else 0
         loss_ok = daily_pnl > -max_loss_usd
@@ -248,8 +252,10 @@ def register_smart_tools(mcp):
             blocked_reasons.append(f"Daily loss limit hit (${daily_pnl:.2f})")
 
         # 5. Max positions
-        max_positions = _get_setting_int("max_open_positions", 3)
-        open_count = execute_one("SELECT COUNT(*) as cnt FROM trades WHERE status = 'open'", ())
+        max_positions = int(s.get("max_open_positions", 3))
+        open_count = execute_one(
+            "SELECT COUNT(*) as cnt FROM trades WHERE user_id = %s AND status = 'open'", (USER_ID,)
+        )
         current_open = open_count["cnt"] if open_count else 0
         pos_ok = current_open < max_positions
         checks["max_positions_ok"] = {
@@ -260,11 +266,10 @@ def register_smart_tools(mcp):
             blocked_reasons.append(f"Max positions reached ({current_open}/{max_positions})")
 
         # 6. Consecutive losses
-        max_con_losses = _get_setting_int("max_consecutive_losses", 5)
+        max_con_losses = int(s.get("max_consecutive_losses", 5))
         recent = execute(
-            """SELECT pnl_usd FROM trades WHERE status = 'closed'
-            ORDER BY closed_at DESC LIMIT %s""",
-            (max_con_losses,)
+            "SELECT pnl_usd FROM trades WHERE user_id = %s AND status = 'closed' ORDER BY closed_at DESC LIMIT %s",
+            (USER_ID, max_con_losses)
         )
         consecutive_losses = 0
         for r in recent:
@@ -281,7 +286,6 @@ def register_smart_tools(mcp):
         if not con_ok:
             blocked_reasons.append(f"Too many consecutive losses ({consecutive_losses})")
 
-        # Can trade?
         can_trade = len(blocked_reasons) == 0
 
         return json.dumps({
@@ -350,7 +354,8 @@ def register_smart_tools(mcp):
         tp2_pips = round(atr_pips * s["tp2_mult"], 1)
 
         # Ensure minimum SL
-        min_rr = _get_setting_float("min_rr_ratio", 1.5)
+        s = _get_settings()
+        min_rr = float(s.get("min_rr_ratio", 1.5))
         if sl_pips < 10:
             sl_pips = 10.0
 
