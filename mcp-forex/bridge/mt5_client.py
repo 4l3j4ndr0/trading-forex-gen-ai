@@ -144,7 +144,7 @@ class MT5Client:
             "magic": 123456,  # EA identifier
             "comment": comment[:63],  # MT5 max comment length
             "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
+            "type_filling": mt5.ORDER_FILLING_FOK,
         }
 
         result = mt5.order_send(request)
@@ -197,7 +197,7 @@ class MT5Client:
             "magic": 123456,
             "comment": "close",
             "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
+            "type_filling": mt5.ORDER_FILLING_FOK,
         }
 
         result = mt5.order_send(request)
