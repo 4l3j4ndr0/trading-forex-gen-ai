@@ -4,4 +4,3 @@ MetaTrader5==5.0.4200
 python-dotenv==1.1.1
 numpy<2
 psycopg2-binary==2.9.10
-pycryptodome==3.21.0

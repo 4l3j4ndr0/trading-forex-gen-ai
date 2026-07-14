@@ -1,6 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
-import encryption from '@adonisjs/core/services/encryption'
 import env from '#start/env'
 
 export default class BrokerController {
@@ -39,7 +38,7 @@ export default class BrokerController {
       user_id: cognito.user.id,
       broker_name: body.brokerName || 'XM',
       mt5_login: body.mt5Login,
-      mt5_password_encrypted: encryption.encrypt(body.mt5Password),
+      mt5_password_encrypted: Buffer.from(body.mt5Password).toString('base64'),
       mt5_server: body.mt5Server,
       symbol_suffix: body.symbolSuffix || '#',
       account_type: body.accountType || 'demo',
@@ -69,19 +68,23 @@ export default class BrokerController {
     const bridgeApiKey = env.get('MT5_BRIDGE_API_KEY')
 
     try {
-      const res = await fetch(`${bridgeUrl}/health`, {
-        headers: { 'X-Bridge-Api-Key': bridgeApiKey },
+      const res = await fetch(`${bridgeUrl}/account`, {
+        headers: {
+          'X-Bridge-Api-Key': bridgeApiKey,
+          'X-User-Id': cognito.user.id,
+        },
       })
       const data = (await res.json()) as Record<string, unknown>
 
-      if (data.mt5_connected) {
+      if (!('error' in data)) {
         await db
           .from('broker_configs')
           .where('user_id', cognito.user.id)
           .update({ last_connected_at: new Date() })
+        return response.ok({ data, connected: true })
       }
 
-      return response.ok({ data, connected: !!data.mt5_connected })
+      return response.ok({ connected: false, error: data.error })
     } catch {
       return response.ok({ connected: false, error: 'Cannot reach bridge' })
     }

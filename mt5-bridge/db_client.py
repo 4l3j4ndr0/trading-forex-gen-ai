@@ -1,8 +1,6 @@
 """Database client for the bridge — reads broker configs."""
 
-import json
 import base64
-import hashlib
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -14,39 +12,10 @@ def _get_conn():
     return psycopg2.connect(Config.DATABASE_URL)
 
 
-def _decrypt_adonisjs(encrypted_value: str, app_key: str) -> str:
-    """
-    Decrypt a value encrypted by AdonisJS encryption service.
-    AdonisJS uses aes-256-cbc with the APP_KEY.
-    The encrypted value is a base64-encoded JSON: {iv, value}
-    """
-    try:
-        # AdonisJS encryption format: base64(JSON({iv, value}))
-        decoded = base64.b64decode(encrypted_value)
-        data = json.loads(decoded)
-
-        iv = base64.b64decode(data["iv"])
-        value = base64.b64decode(data["value"])
-
-        # Derive key from APP_KEY
-        key = base64.b64decode(app_key)
-
-        # AES-256-CBC decrypt
-        from Crypto.Cipher import AES
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        decrypted = cipher.decrypt(value)
-
-        # Remove PKCS7 padding
-        pad_len = decrypted[-1]
-        return decrypted[:-pad_len].decode("utf-8")
-    except Exception as e:
-        raise ValueError(f"Decryption failed: {e}")
-
-
 def get_user_broker_config(user_id: str) -> dict | None:
     """
     Get broker config for a user from the database.
-    Returns decrypted credentials ready to use.
+    Decodes base64 password.
     """
     conn = _get_conn()
     try:
@@ -65,8 +34,8 @@ def get_user_broker_config(user_id: str) -> dict | None:
         if not row["is_active"]:
             return None
 
-        # Decrypt password
-        mt5_password = _decrypt_adonisjs(row["mt5_password_encrypted"], Config.APP_KEY)
+        # Decode base64 password
+        mt5_password = base64.b64decode(row["mt5_password_encrypted"]).decode("utf-8")
 
         return {
             "broker_name": row["broker_name"],
