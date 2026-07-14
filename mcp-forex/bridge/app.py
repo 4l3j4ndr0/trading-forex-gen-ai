@@ -155,6 +155,64 @@ def order_modify():
     return jsonify(result)
 
 
+# ─── Market Data ──────────────────────────────────────────
+
+@app.route("/candles/<symbol>", methods=["GET"])
+@require_api_key
+def candles(symbol):
+    """Get OHLCV candles.
+    
+    Query params:
+        timeframe: M1, M5, M15, M30, H1, H4, D1, W1 (default H1)
+        count: number of candles (default 100, max 1000)
+    """
+    timeframe = request.args.get("timeframe", "H1").upper()
+    count = min(int(request.args.get("count", 100)), 1000)
+
+    result = mt5.get_candles(symbol, timeframe, count)
+    if isinstance(result, dict) and "error" in result:
+        return jsonify(result), 400
+    return jsonify({"symbol": symbol, "timeframe": timeframe, "count": len(result), "candles": result})
+
+
+@app.route("/indicator/atr/<symbol>", methods=["GET"])
+@require_api_key
+def indicator_atr(symbol):
+    """Calculate ATR (Average True Range).
+    
+    Query params:
+        period: ATR period (default 14)
+        timeframe: M5, M15, H1, H4, D1 (default H1)
+    """
+    period = int(request.args.get("period", 14))
+    timeframe = request.args.get("timeframe", "H1").upper()
+
+    result = mt5.get_atr(symbol, timeframe, period)
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/indicator/spread/<symbol>", methods=["GET"])
+@require_api_key
+def indicator_spread(symbol):
+    """Get current real-time spread."""
+    result = mt5.get_spread(symbol)
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/tick/<symbol>", methods=["GET"])
+@require_api_key
+def tick(symbol):
+    """Get current bid/ask tick."""
+    result = mt5.get_tick(symbol)
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
 # ─── Run ──────────────────────────────────────────────────
 
 if __name__ == "__main__":

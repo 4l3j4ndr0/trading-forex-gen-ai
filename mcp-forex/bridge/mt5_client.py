@@ -250,3 +250,147 @@ class MT5Client:
             "old_tp": pos.tp,
             "new_tp": tp if tp is not None else pos.tp,
         }
+
+    # ─── Market Data ──────────────────────────────────────
+
+    TIMEFRAME_MAP = {
+        "M1": mt5.TIMEFRAME_M1,
+        "M5": mt5.TIMEFRAME_M5,
+        "M15": mt5.TIMEFRAME_M15,
+        "M30": mt5.TIMEFRAME_M30,
+        "H1": mt5.TIMEFRAME_H1,
+        "H4": mt5.TIMEFRAME_H4,
+        "D1": mt5.TIMEFRAME_D1,
+        "W1": mt5.TIMEFRAME_W1,
+        "MN1": mt5.TIMEFRAME_MN1,
+    }
+
+    def get_candles(self, symbol: str, timeframe: str = "H1", count: int = 100) -> list | dict:
+        """Get OHLCV candles from MT5."""
+        self._ensure_connected()
+
+        tf = self.TIMEFRAME_MAP.get(timeframe)
+        if tf is None:
+            return {"error": f"Invalid timeframe '{timeframe}'. Use: {list(self.TIMEFRAME_MAP.keys())}"}
+
+        # Ensure symbol is in Market Watch
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            return {"error": f"Symbol '{symbol}' not found"}
+        if not info.visible:
+            mt5.symbol_select(symbol, True)
+
+        rates = mt5.copy_rates_from_pos(symbol, tf, 0, count)
+        if rates is None or len(rates) == 0:
+            return {"error": f"No candle data for {symbol} {timeframe}"}
+
+        candles = []
+        for r in rates:
+            candles.append({
+                "time": int(r["time"]),
+                "open": float(r["open"]),
+                "high": float(r["high"]),
+                "low": float(r["low"]),
+                "close": float(r["close"]),
+                "volume": int(r["tick_volume"]),
+            })
+
+        return candles
+
+    def get_atr(self, symbol: str, timeframe: str = "H1", period: int = 14) -> dict:
+        """Calculate ATR from candle data."""
+        self._ensure_connected()
+
+        # Need period + 1 candles to calculate ATR
+        candles = self.get_candles(symbol, timeframe, period + 50)
+        if isinstance(candles, dict) and "error" in candles:
+            return candles
+
+        if len(candles) < period + 1:
+            return {"error": f"Not enough data. Got {len(candles)} candles, need {period + 1}"}
+
+        # Calculate True Range for each candle
+        true_ranges = []
+        for i in range(1, len(candles)):
+            high = candles[i]["high"]
+            low = candles[i]["low"]
+            prev_close = candles[i - 1]["close"]
+
+            tr = max(
+                high - low,
+                abs(high - prev_close),
+                abs(low - prev_close),
+            )
+            true_ranges.append(tr)
+
+        # ATR = SMA of last `period` true ranges
+        atr_values = []
+        for i in range(len(true_ranges) - period, len(true_ranges)):
+            window = true_ranges[i - period + 1 : i + 1]
+            atr_values.append(sum(window) / len(window))
+
+        current_atr = atr_values[-1] if atr_values else 0
+
+        # Convert to pips
+        if "JPY" in symbol:
+            pip_size = 0.01
+        else:
+            pip_size = 0.0001
+
+        atr_pips = current_atr / pip_size
+
+        return {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "period": period,
+            "atr": round(current_atr, 6),
+            "atr_pips": round(atr_pips, 1),
+            "last_candle": candles[-1],
+        }
+
+    def get_spread(self, symbol: str) -> dict:
+        """Get current real-time spread."""
+        self._ensure_connected()
+
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            return {"error": f"Symbol '{symbol}' not found"}
+
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None:
+            return {"error": f"Cannot get tick for {symbol}"}
+
+        spread_points = info.spread
+        point = info.point
+
+        if "JPY" in symbol:
+            pip_size = 0.01
+        else:
+            pip_size = 0.0001
+
+        spread_pips = spread_points * point / pip_size
+
+        return {
+            "symbol": symbol,
+            "spread_points": spread_points,
+            "spread_pips": round(spread_pips, 1),
+            "bid": tick.bid,
+            "ask": tick.ask,
+            "point": point,
+        }
+
+    def get_tick(self, symbol: str) -> dict:
+        """Get current bid/ask."""
+        self._ensure_connected()
+
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None:
+            return {"error": f"Cannot get tick for {symbol}"}
+
+        return {
+            "symbol": symbol,
+            "bid": tick.bid,
+            "ask": tick.ask,
+            "time": int(tick.time),
+            "volume": tick.volume,
+        }
