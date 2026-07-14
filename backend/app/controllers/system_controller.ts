@@ -1,6 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
-import encryption from '@adonisjs/core/services/encryption'
+import env from '#start/env'
 
 export default class SystemController {
   async health({ cognito, response }: HttpContext) {
@@ -13,8 +13,9 @@ export default class SystemController {
 
     if (config) {
       try {
-        const bridgeApiKey = encryption.decrypt(config.bridge_api_key_encrypted) as string
-        const res = await fetch(`${config.bridge_url}/health`, {
+        const bridgeUrl = env.get('MT5_BRIDGE_URL')
+        const bridgeApiKey = env.get('MT5_BRIDGE_API_KEY')
+        const res = await fetch(`${bridgeUrl}/health`, {
           headers: { 'X-Bridge-Api-Key': bridgeApiKey },
           signal: AbortSignal.timeout(5000),
         })

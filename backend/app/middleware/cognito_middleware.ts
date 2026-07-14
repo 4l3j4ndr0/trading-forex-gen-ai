@@ -42,7 +42,7 @@ export default class CognitoMiddleware {
     const sub = payload.sub
     const email = typeof payload.email === 'string' ? payload.email : ''
 
-    // Buscar o crear usuario (Opción A: lazy creation)
+    // Buscar o crear usuario (lazy creation)
     let user = await User.findBy('cognito_sub', sub)
 
     if (!user) {
@@ -52,26 +52,34 @@ export default class CognitoMiddleware {
         newUser.email = email
         newUser.fullName = typeof payload.name === 'string' ? payload.name : null
         newUser.accountCurrency = 'USD'
-        newUser.accountBalance = 0
         newUser.isActive = true
         newUser.useTransaction(trx)
         await newUser.save()
 
-        // Crear settings con valores por defecto
-        await trx.insertQuery().table('user_settings').insert({
+        // Crear trading_settings con defaults
+        await trx.insertQuery().table('trading_settings').insert({
           user_id: newUser.id,
-          max_risk_per_trade: 1.0,
-          max_daily_drawdown: 6.0,
-          max_weekly_drawdown: 15.0,
+          max_risk_per_trade_pct: 1.0,
+          max_daily_loss_pct: 1.0,
+          max_drawdown_pct: 5.0,
+          max_consecutive_losses: 5,
+          min_rr_ratio: 1.5,
+          default_lot_size: 0.05,
+          max_lot_size: 0.50,
           max_open_positions: 3,
-          preferred_pairs: JSON.stringify(['EUR/USD', 'GBP/USD', 'USD/JPY']),
-          preferred_sessions: JSON.stringify(['london', 'new_york']),
-          min_signal_score: 6,
-          min_signal_class: 'B',
-          alert_channels: JSON.stringify({ websocket: true, email: false }),
-          timezone: 'America/Bogota',
+          trading_start_utc: '07:00',
+          trading_end_utc: '21:00',
+          news_buffer_minutes: 30,
+          max_trade_duration_minutes: 240,
+          daily_target_pct: 1.0,
+          reduce_lot_at_pct: 80,
+          min_adx_entry: 25,
+          min_alignment_score: 2,
+          max_spread_pips: 3.0,
+          allowed_pairs: JSON.stringify(['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'EURGBP']),
+          kill_switch: false,
+          auto_trading_enabled: true,
           created_at: new Date(),
-          updated_at: new Date(),
         })
 
         return newUser

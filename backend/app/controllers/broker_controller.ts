@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import encryption from '@adonisjs/core/services/encryption'
+import env from '#start/env'
 
 export default class BrokerController {
   async show({ cognito, response }: HttpContext) {
@@ -16,7 +17,6 @@ export default class BrokerController {
         brokerName: config.broker_name,
         mt5Login: config.mt5_login,
         mt5Server: config.mt5_server,
-        bridgeUrl: config.bridge_url,
         symbolSuffix: config.symbol_suffix,
         accountType: config.account_type,
         isActive: config.is_active,
@@ -31,8 +31,6 @@ export default class BrokerController {
       'mt5Login',
       'mt5Password',
       'mt5Server',
-      'bridgeUrl',
-      'bridgeApiKey',
       'symbolSuffix',
       'accountType',
     ])
@@ -43,8 +41,6 @@ export default class BrokerController {
       mt5_login: body.mt5Login,
       mt5_password_encrypted: encryption.encrypt(body.mt5Password),
       mt5_server: body.mt5Server,
-      bridge_url: body.bridgeUrl,
-      bridge_api_key_encrypted: encryption.encrypt(body.bridgeApiKey),
       symbol_suffix: body.symbolSuffix || '#',
       account_type: body.accountType || 'demo',
       is_active: true,
@@ -69,9 +65,11 @@ export default class BrokerController {
       return response.badRequest({ message: 'No broker configured' })
     }
 
+    const bridgeUrl = env.get('MT5_BRIDGE_URL')
+    const bridgeApiKey = env.get('MT5_BRIDGE_API_KEY')
+
     try {
-      const bridgeApiKey = encryption.decrypt(config.bridge_api_key_encrypted) as string
-      const res = await fetch(`${config.bridge_url}/health`, {
+      const res = await fetch(`${bridgeUrl}/health`, {
         headers: { 'X-Bridge-Api-Key': bridgeApiKey },
       })
       const data = (await res.json()) as Record<string, unknown>
@@ -84,7 +82,7 @@ export default class BrokerController {
       }
 
       return response.ok({ data, connected: !!data.mt5_connected })
-    } catch (error) {
+    } catch {
       return response.ok({ connected: false, error: 'Cannot reach bridge' })
     }
   }

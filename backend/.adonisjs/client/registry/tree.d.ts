@@ -4,11 +4,36 @@ import type { routes } from './index.ts'
 export interface ApiDefinition {
   me: {
     show: typeof routes['me.show']
-    updateSettings: typeof routes['me.update_settings']
   }
-  analysis: {
-    run: typeof routes['analysis.run']
-    analyses: typeof routes['analysis.analyses']
-    signals: typeof routes['analysis.signals']
+  broker: {
+    show: typeof routes['broker.show']
+    upsert: typeof routes['broker.upsert']
+    testConnection: typeof routes['broker.test_connection']
+    destroy: typeof routes['broker.destroy']
+  }
+  tradingSettings: {
+    show: typeof routes['trading_settings.show']
+    update: typeof routes['trading_settings.update']
+    reset: typeof routes['trading_settings.reset']
+  }
+  trades: {
+    index: typeof routes['trades.index']
+    open: typeof routes['trades.open']
+    stats: typeof routes['trades.stats']
+    show: typeof routes['trades.show']
+  }
+  daily: {
+    index: typeof routes['daily.index']
+    today: typeof routes['daily.today']
+    show: typeof routes['daily.show']
+  }
+  logs: {
+    index: typeof routes['logs.index']
+    show: typeof routes['logs.show']
+  }
+  system: {
+    health: typeof routes['system.health']
+    status: typeof routes['system.status']
+    killSwitch: typeof routes['system.kill_switch']
   }
 }

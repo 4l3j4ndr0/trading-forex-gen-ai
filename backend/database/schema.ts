@@ -8,14 +8,10 @@ import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
 export class BrokerConfigSchema extends BaseModel {
-  static $columns = ['accountType', 'bridgeApiKeyEncrypted', 'bridgeUrl', 'brokerName', 'createdAt', 'id', 'isActive', 'lastConnectedAt', 'mt5Login', 'mt5PasswordEncrypted', 'mt5Server', 'symbolSuffix', 'updatedAt', 'userId'] as const
+  static $columns = ['accountType', 'brokerName', 'createdAt', 'id', 'isActive', 'lastConnectedAt', 'mt5Login', 'mt5PasswordEncrypted', 'mt5Server', 'symbolSuffix', 'updatedAt', 'userId'] as const
   $columns = BrokerConfigSchema.$columns
   @column()
   declare accountType: string
-  @column()
-  declare bridgeApiKeyEncrypted: string
-  @column()
-  declare bridgeUrl: string
   @column()
   declare brokerName: string
   @column.dateTime({ autoCreate: true })
@@ -260,14 +256,10 @@ export class TradingSettingSchema extends BaseModel {
 }
 
 export class UserSchema extends BaseModel {
-  static $columns = ['accountBalance', 'accountCurrency', 'avatarUrl', 'cognitoSub', 'createdAt', 'email', 'fullName', 'id', 'isActive', 'lastLoginAt', 'updatedAt'] as const
+  static $columns = ['accountCurrency', 'cognitoSub', 'createdAt', 'email', 'fullName', 'id', 'isActive', 'lastLoginAt', 'updatedAt'] as const
   $columns = UserSchema.$columns
   @column()
-  declare accountBalance: string
-  @column()
   declare accountCurrency: string
-  @column()
-  declare avatarUrl: string | null
   @column()
   declare cognitoSub: string
   @column.dateTime({ autoCreate: true })

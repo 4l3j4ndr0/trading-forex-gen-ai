@@ -34,6 +34,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   // AWS
   AWS_REGION: Env.schema.string.optional(),
 
+  // MT5 Bridge
+  MT5_BRIDGE_URL: Env.schema.string(),
+  MT5_BRIDGE_API_KEY: Env.schema.string(),
+
   // Frontend URL (CORS)
   FRONTEND_URL: Env.schema.string({ format: 'url', tld: false }),
 })

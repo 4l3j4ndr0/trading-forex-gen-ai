@@ -11,8 +11,6 @@ export default class extends BaseSchema {
       table.integer('mt5_login').notNullable()
       table.text('mt5_password_encrypted').notNullable()
       table.string('mt5_server', 100).notNullable()
-      table.string('bridge_url', 255).notNullable()
-      table.text('bridge_api_key_encrypted').notNullable()
       table.string('symbol_suffix', 10).notNullable().defaultTo('#')
       table.string('account_type', 10).notNullable().defaultTo('demo')
       table.boolean('is_active').notNullable().defaultTo(true)

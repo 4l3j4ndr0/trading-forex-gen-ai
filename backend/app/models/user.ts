@@ -15,13 +15,7 @@ export default class User extends BaseModel {
   declare fullName: string | null
 
   @column()
-  declare avatarUrl: string | null
-
-  @column()
   declare accountCurrency: string
-
-  @column()
-  declare accountBalance: number
 
   @column()
   declare isActive: boolean
