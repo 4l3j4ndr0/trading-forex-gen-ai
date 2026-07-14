@@ -7,7 +7,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://forex_user:forex_pass@localhost:5433/forex_trading")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 _pool: ThreadedConnectionPool | None = None
 
@@ -65,36 +65,3 @@ def execute_one(query: str, params: tuple = None) -> dict | None:
 def execute_insert(query: str, params: tuple = None) -> dict | None:
     """Execute an INSERT ... RETURNING and return the row."""
     return execute_one(query, params)
-
-
-def run_migrations():
-    """Run all migration files in order."""
-    migrations_dir = os.path.join(os.path.dirname(__file__), "..", "..", "migrations")
-    if not os.path.exists(migrations_dir):
-        return
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            # Create migrations tracking table
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS _migrations (
-                    filename VARCHAR(200) PRIMARY KEY,
-                    applied_at TIMESTAMPTZ DEFAULT NOW()
-                )
-            """)
-
-            # Get already applied
-            cur.execute("SELECT filename FROM _migrations ORDER BY filename")
-            applied = {row[0] for row in cur.fetchall()}
-
-            # Apply new ones
-            files = sorted(f for f in os.listdir(migrations_dir) if f.endswith(".sql"))
-            for f in files:
-                if f not in applied:
-                    path = os.path.join(migrations_dir, f)
-                    with open(path) as sql_file:
-                        cur.execute(sql_file.read())
-                    cur.execute("INSERT INTO _migrations (filename) VALUES (%s)", (f,))
-                    print(f"  ✅ Migration: {f}")
-
-        conn.commit()

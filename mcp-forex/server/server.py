@@ -16,7 +16,6 @@ load_dotenv()
 
 from fastmcp import FastMCP
 from src.tools import register_all_tools
-from src.core.db import run_migrations
 
 # Create MCP server
 mcp = FastMCP("Forex Trading MCP")
@@ -26,13 +25,6 @@ register_all_tools(mcp)
 
 
 if __name__ == "__main__":
-    # Run migrations on startup
-    try:
-        run_migrations()
-        print("✅ Database migrations OK")
-    except Exception as e:
-        print(f"⚠️  Database not available: {e} (analysis tools still work)")
-
     transport = "streamable-http" if ("--http" in sys.argv or os.getenv("MCP_TRANSPORT") == "http") else "stdio"
 
     if transport == "streamable-http":

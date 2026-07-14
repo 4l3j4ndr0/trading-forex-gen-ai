@@ -347,11 +347,11 @@ def register_smart_tools(mcp):
             "balanced": {"sl_mult": 1.5, "tp1_mult": 2.0, "tp2_mult": 3.0},
             "aggressive": {"sl_mult": 1.0, "tp1_mult": 2.5, "tp2_mult": 4.0},
         }
-        s = strategies.get(strategy, strategies["balanced"])
+        strat = strategies.get(strategy, strategies["balanced"])
 
-        sl_pips = round(atr_pips * s["sl_mult"], 1)
-        tp1_pips = round(atr_pips * s["tp1_mult"], 1)
-        tp2_pips = round(atr_pips * s["tp2_mult"], 1)
+        sl_pips = round(atr_pips * strat["sl_mult"], 1)
+        tp1_pips = round(atr_pips * strat["tp1_mult"], 1)
+        tp2_pips = round(atr_pips * strat["tp2_mult"], 1)
 
         # Ensure minimum SL
         s = _get_settings()
@@ -381,19 +381,19 @@ def register_smart_tools(mcp):
             "stop_loss": {
                 "price": sl_price,
                 "pips": sl_pips,
-                "method": f"{s['sl_mult']}× ATR",
+                "method": f"{strat['sl_mult']}× ATR",
             },
             "take_profit_1": {
                 "price": tp1_price,
                 "pips": tp1_pips,
                 "rr_ratio": rr1,
-                "method": f"{s['tp1_mult']}× ATR",
+                "method": f"{strat['tp1_mult']}× ATR",
             },
             "take_profit_2": {
                 "price": tp2_price,
                 "pips": tp2_pips,
                 "rr_ratio": rr2,
-                "method": f"{s['tp2_mult']}× ATR",
+                "method": f"{strat['tp2_mult']}× ATR",
             },
             "recommended_tp": "take_profit_1" if rr1 >= min_rr else "take_profit_2",
             "min_rr_required": min_rr,

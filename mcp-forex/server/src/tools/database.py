@@ -1,9 +1,18 @@
 """Database tools — CRUD for trades, settings, logs, and performance."""
 
+import os
 import json
 from datetime import datetime, timezone, timedelta
 
 from src.core.db import execute, execute_one, execute_insert
+
+USER_ID = os.getenv("USER_ID", "")
+
+
+def _get_settings() -> dict:
+    """Get trading settings for the current user."""
+    row = execute_one("SELECT * FROM trading_settings WHERE user_id = %s", (USER_ID,))
+    return row or {}
 
 
 def register_database_tools(mcp):
@@ -12,7 +21,7 @@ def register_database_tools(mcp):
     @mcp.tool()
     def get_trading_settings(category: str = None) -> str:
         """
-        Get all trading settings or filter by category.
+        Get all trading settings for the current user.
 
         Args:
             category: Optional filter — 'risk', 'sizing', 'session', 'pairs', 'target', 'filters', 'system'
@@ -20,35 +29,51 @@ def register_database_tools(mcp):
         Returns:
             All settings grouped by category.
         """
-        if category:
-            rows = execute(
-                "SELECT key, value, description, category FROM trading_settings WHERE category = %s ORDER BY key",
-                (category,)
-            )
-        else:
-            rows = execute("SELECT key, value, description, category FROM trading_settings ORDER BY category, key")
+        s = _get_settings()
+        if not s:
+            return json.dumps({"error": "No trading settings found. Configure in frontend first."})
 
-        # Group by category
-        grouped = {}
-        for r in rows:
-            cat = r["category"]
-            if cat not in grouped:
-                grouped[cat] = {}
-            # Try to cast value to number
-            val = r["value"]
-            try:
-                if "." in val:
-                    val = float(val)
-                else:
-                    val = int(val)
-            except (ValueError, TypeError):
-                if val == "true":
-                    val = True
-                elif val == "false":
-                    val = False
-            grouped[cat][r["key"]] = val
+        all_settings = {
+            "risk": {
+                "max_risk_per_trade_pct": float(s.get("max_risk_per_trade_pct", 1.0)),
+                "max_daily_loss_pct": float(s.get("max_daily_loss_pct", 1.0)),
+                "max_drawdown_pct": float(s.get("max_drawdown_pct", 5.0)),
+                "max_consecutive_losses": int(s.get("max_consecutive_losses", 5)),
+                "min_rr_ratio": float(s.get("min_rr_ratio", 1.5)),
+            },
+            "sizing": {
+                "default_lot_size": float(s.get("default_lot_size", 0.05)),
+                "max_lot_size": float(s.get("max_lot_size", 0.50)),
+                "max_open_positions": int(s.get("max_open_positions", 3)),
+            },
+            "session": {
+                "trading_start_utc": str(s.get("trading_start_utc", "07:00")),
+                "trading_end_utc": str(s.get("trading_end_utc", "21:00")),
+                "news_buffer_minutes": int(s.get("news_buffer_minutes", 30)),
+                "max_trade_duration_minutes": int(s.get("max_trade_duration_minutes", 240)),
+            },
+            "target": {
+                "daily_target_pct": float(s.get("daily_target_pct", 1.0)),
+                "reduce_lot_at_pct": int(s.get("reduce_lot_at_pct", 80)),
+            },
+            "filters": {
+                "min_adx_entry": int(s.get("min_adx_entry", 25)),
+                "min_alignment_score": int(s.get("min_alignment_score", 2)),
+                "max_spread_pips": float(s.get("max_spread_pips", 3.0)),
+            },
+            "pairs": {
+                "allowed_pairs": json.loads(s["allowed_pairs"]) if isinstance(s.get("allowed_pairs"), str) else s.get("allowed_pairs", []),
+            },
+            "system": {
+                "kill_switch": bool(s.get("kill_switch", False)),
+                "auto_trading_enabled": bool(s.get("auto_trading_enabled", True)),
+            },
+        }
 
-        return json.dumps({"settings": grouped})
+        if category and category in all_settings:
+            return json.dumps({"settings": {category: all_settings[category]}})
+
+        return json.dumps({"settings": all_settings})
 
     @mcp.tool()
     def update_trading_setting(key: str, value: str) -> str:
@@ -56,28 +81,41 @@ def register_database_tools(mcp):
         Update a specific trading setting.
 
         Args:
-            key: Setting key (e.g. 'max_lot_size', 'kill_switch', 'allowed_pairs')
+            key: Setting column name (e.g. 'max_lot_size', 'kill_switch', 'daily_target_pct')
             value: New value as string
 
         Returns:
             Confirmation with old and new value.
         """
-        current = execute_one("SELECT value, category FROM trading_settings WHERE key = %s", (key,))
-        if not current:
-            return json.dumps({"error": f"Setting '{key}' not found"})
+        s = _get_settings()
+        if not s:
+            return json.dumps({"error": "No trading settings found"})
 
-        execute(
-            "UPDATE trading_settings SET value = %s, updated_at = NOW() WHERE key = %s",
-            (value, key)
-        )
+        # Validate key exists
+        valid_keys = [
+            "max_risk_per_trade_pct", "max_daily_loss_pct", "max_drawdown_pct",
+            "max_consecutive_losses", "min_rr_ratio", "default_lot_size", "max_lot_size",
+            "max_open_positions", "trading_start_utc", "trading_end_utc",
+            "news_buffer_minutes", "max_trade_duration_minutes", "daily_target_pct",
+            "reduce_lot_at_pct", "min_adx_entry", "min_alignment_score", "max_spread_pips",
+            "allowed_pairs", "kill_switch", "auto_trading_enabled",
+        ]
 
-        return json.dumps({
-            "updated": True,
-            "key": key,
-            "old_value": current["value"],
-            "new_value": value,
-            "category": current["category"],
-        })
+        if key not in valid_keys:
+            return json.dumps({"error": f"Invalid key '{key}'. Valid: {valid_keys}"})
+
+        old_value = str(s.get(key, ""))
+
+        # Convert value appropriately
+        if key in ("kill_switch", "auto_trading_enabled"):
+            db_value = value.lower() in ("true", "1", "yes")
+            execute(f"UPDATE trading_settings SET {key} = %s, updated_at = NOW() WHERE user_id = %s", (db_value, USER_ID))
+        elif key == "allowed_pairs":
+            execute(f"UPDATE trading_settings SET {key} = %s, updated_at = NOW() WHERE user_id = %s", (value, USER_ID))
+        else:
+            execute(f"UPDATE trading_settings SET {key} = %s, updated_at = NOW() WHERE user_id = %s", (value, USER_ID))
+
+        return json.dumps({"updated": True, "key": key, "old_value": old_value, "new_value": value})
 
     @mcp.tool()
     def register_trade(
@@ -102,8 +140,8 @@ def register_database_tools(mcp):
             side: BUY or SELL
             lot_size: Position size in lots
             entry_price: Entry price
-            sl_price: Stop loss price
-            tp_price: Take profit price
+            sl_price: Stop Loss price
+            tp_price: Take Profit price
             sl_pips: Stop loss in pips
             tp_pips: Take profit in pips
             risk_usd: Risk amount in USD
@@ -114,12 +152,16 @@ def register_database_tools(mcp):
         """
         rr_ratio = round(tp_pips / sl_pips, 2) if sl_pips > 0 else 0
 
+        # Get pair_id
+        pair = execute_one("SELECT id FROM pairs WHERE symbol = %s", (symbol,))
+        pair_id = pair["id"] if pair else 1
+
         row = execute_insert(
-            """INSERT INTO trades (ticket, symbol, side, lot_size, entry_price, sl_price, tp_price,
-                sl_pips, tp_pips, risk_usd, rr_ratio, comment, status, opened_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'open', NOW())
+            """INSERT INTO trades (user_id, pair_id, ticket, side, lot_size, entry_price, sl_price, tp_price,
+                sl_pips, tp_pips, risk_usd, rr_ratio, comment, status, opened_at, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'open', NOW(), NOW())
             RETURNING id""",
-            (ticket, symbol, side.upper(), lot_size, entry_price, sl_price, tp_price,
+            (USER_ID, pair_id, ticket, side.upper(), lot_size, entry_price, sl_price, tp_price,
              sl_pips, tp_pips, risk_usd, rr_ratio, comment)
         )
 
@@ -146,7 +188,7 @@ def register_database_tools(mcp):
         Returns:
             Confirmation with holding time.
         """
-        trade = execute_one("SELECT opened_at FROM trades WHERE id = %s", (trade_id,))
+        trade = execute_one("SELECT opened_at FROM trades WHERE id = %s AND user_id = %s", (trade_id, USER_ID))
         if not trade:
             return json.dumps({"error": f"Trade '{trade_id}' not found"})
 
@@ -156,7 +198,7 @@ def register_database_tools(mcp):
         execute(
             """UPDATE trades SET exit_price = %s, pnl_pips = %s, pnl_usd = %s,
                 close_reason = %s, status = 'closed', closed_at = NOW(),
-                holding_minutes = %s
+                holding_minutes = %s, updated_at = NOW()
             WHERE id = %s""",
             (exit_price, pnl_pips, pnl_usd, close_reason, round(holding_minutes, 1), trade_id)
         )
@@ -188,26 +230,26 @@ def register_database_tools(mcp):
         else:
             start = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
-        query = """SELECT id, symbol, side, lot_size, entry_price, exit_price,
-                    pnl_pips, pnl_usd, rr_ratio, holding_minutes, close_reason, closed_at
-                FROM trades WHERE status = 'closed' AND closed_at >= %s AND closed_at <= %s"""
-        params = [start, now]
+        query = """SELECT t.id, p.symbol, t.side, t.lot_size, t.entry_price, t.exit_price,
+                    t.pnl_pips, t.pnl_usd, t.rr_ratio, t.holding_minutes, t.close_reason, t.closed_at
+                FROM trades t JOIN pairs p ON t.pair_id = p.id
+                WHERE t.user_id = %s AND t.status = 'closed' AND t.closed_at >= %s AND t.closed_at <= %s"""
+        params = [USER_ID, start, now]
 
         if symbol:
-            query += " AND symbol = %s"
+            query += " AND p.symbol = %s"
             params.append(symbol)
 
-        query += " ORDER BY closed_at DESC"
+        query += " ORDER BY t.closed_at DESC LIMIT 50"
         rows = execute(query, tuple(params))
 
-        # Serialize
         trades = []
         for r in rows:
             trades.append({
                 "trade_id": str(r["id"]),
                 "symbol": r["symbol"],
                 "side": r["side"],
-                "lot_size": float(r["lot_size"]),
+                "lot_size": float(r["lot_size"]) if r["lot_size"] else 0,
                 "pnl_pips": float(r["pnl_pips"]) if r["pnl_pips"] else 0,
                 "pnl_usd": float(r["pnl_usd"]) if r["pnl_usd"] else 0,
                 "rr_ratio": float(r["rr_ratio"]) if r["rr_ratio"] else 0,
@@ -215,27 +257,20 @@ def register_database_tools(mcp):
                 "close_reason": r["close_reason"],
             })
 
-        # Stats
         total_pnl = sum(t["pnl_usd"] for t in trades)
         wins = [t for t in trades if t["pnl_usd"] > 0]
         losses = [t for t in trades if t["pnl_usd"] <= 0]
-        avg_win = sum(t["pnl_usd"] for t in wins) / len(wins) if wins else 0
-        avg_loss = sum(t["pnl_usd"] for t in losses) / len(losses) if losses else 0
-        profit_factor = abs(sum(t["pnl_usd"] for t in wins) / sum(t["pnl_usd"] for t in losses)) if losses and sum(t["pnl_usd"] for t in losses) != 0 else 0
 
         return json.dumps({
             "period": period,
             "symbol": symbol,
             "count": len(trades),
-            "trades": trades[:50],  # Limit response size
+            "trades": trades,
             "stats": {
                 "total_pnl_usd": round(total_pnl, 4),
                 "wins": len(wins),
                 "losses": len(losses),
                 "win_rate": round(len(wins) / max(len(trades), 1) * 100, 1),
-                "avg_winner": round(avg_win, 4),
-                "avg_loser": round(avg_loss, 4),
-                "profit_factor": round(profit_factor, 2),
             },
         })
 
@@ -256,14 +291,13 @@ def register_database_tools(mcp):
             target_date = datetime.now(timezone.utc).date()
 
         rows = execute(
-            """SELECT pnl_usd FROM trades
-            WHERE status = 'closed' AND closed_at::date = %s""",
-            (target_date,)
+            "SELECT pnl_usd FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at::date = %s",
+            (USER_ID, target_date)
         )
 
         pnls = [float(r["pnl_usd"]) for r in rows if r["pnl_usd"] is not None]
         open_count = execute_one(
-            "SELECT COUNT(*) as cnt FROM trades WHERE status = 'open'", ()
+            "SELECT COUNT(*) as cnt FROM trades WHERE user_id = %s AND status = 'open'", (USER_ID,)
         )
 
         return json.dumps({
@@ -297,10 +331,8 @@ def register_database_tools(mcp):
             start = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
         rows = execute(
-            """SELECT pnl_usd, pnl_pips, rr_ratio, closed_at
-            FROM trades WHERE status = 'closed' AND closed_at >= %s
-            ORDER BY closed_at ASC""",
-            (start,)
+            "SELECT pnl_usd FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at >= %s ORDER BY closed_at ASC",
+            (USER_ID, start)
         )
 
         if not rows:
@@ -311,10 +343,7 @@ def register_database_tools(mcp):
         losses = [p for p in pnls if p <= 0]
 
         # Max consecutive
-        max_con_wins = 0
-        max_con_losses = 0
-        current_wins = 0
-        current_losses = 0
+        max_con_wins = max_con_losses = current_wins = current_losses = 0
         for p in pnls:
             if p > 0:
                 current_wins += 1
@@ -326,16 +355,12 @@ def register_database_tools(mcp):
                 max_con_losses = max(max_con_losses, current_losses)
 
         # Max drawdown
-        peak = 0
-        max_dd = 0
-        cumulative = 0
+        peak = max_dd = cumulative = 0.0
         for p in pnls:
             cumulative += p
             peak = max(peak, cumulative)
-            dd = peak - cumulative
-            max_dd = max(max_dd, dd)
+            max_dd = max(max_dd, peak - cumulative)
 
-        # Profit factor
         gross_profit = sum(wins) if wins else 0
         gross_loss = abs(sum(losses)) if losses else 0
         pf = round(gross_profit / gross_loss, 2) if gross_loss > 0 else 0
@@ -347,8 +372,6 @@ def register_database_tools(mcp):
             "profit_factor": pf,
             "total_pnl_usd": round(sum(pnls), 4),
             "avg_pnl_per_trade": round(sum(pnls) / len(pnls), 4),
-            "avg_winner": round(sum(wins) / len(wins), 4) if wins else 0,
-            "avg_loser": round(sum(losses) / len(losses), 4) if losses else 0,
             "max_consecutive_wins": max_con_wins,
             "max_consecutive_losses": max_con_losses,
             "current_consecutive_losses": current_losses,
@@ -381,19 +404,19 @@ def register_database_tools(mcp):
             Log ID and timestamp.
         """
         now = datetime.now(timezone.utc)
+        hour = now.hour
 
-        # Get daily cumulative PnL
+        # Cumulative PnL today
         daily_rows = execute(
-            "SELECT COALESCE(SUM(pnl_usd), 0) as total FROM trades WHERE status = 'closed' AND closed_at::date = %s",
-            (now.date(),)
+            "SELECT COALESCE(SUM(pnl_usd), 0) as total FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at::date = %s",
+            (USER_ID, now.date())
         )
         cumulative = float(daily_rows[0]["total"]) if daily_rows else 0
 
-        # Open positions count
-        open_count = execute_one("SELECT COUNT(*) as cnt FROM trades WHERE status = 'open'", ())
+        # Open positions
+        open_count = execute_one("SELECT COUNT(*) as cnt FROM trades WHERE user_id = %s AND status = 'open'", (USER_ID,))
 
-        # Determine session
-        hour = now.hour
+        # Session
         sessions = []
         if 7 <= hour < 16:
             sessions.append("london")
@@ -402,22 +425,17 @@ def register_database_tools(mcp):
         session = "overlap" if len(sessions) == 2 else (sessions[0] if sessions else "off_hours")
 
         row = execute_insert(
-            """INSERT INTO hourly_logs (timestamp, utc_hour, session, open_positions,
+            """INSERT INTO hourly_logs (user_id, timestamp, utc_hour, session, open_positions,
                 trades_opened, trades_closed, trades_skipped, pnl_this_hour,
-                cumulative_pnl_today, symbols_analyzed, market_context, decision_summary)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                cumulative_pnl_today, symbols_analyzed, market_context, decision_summary, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             RETURNING id""",
-            (now, hour, session, open_count["cnt"] if open_count else 0,
+            (USER_ID, now, hour, session, open_count["cnt"] if open_count else 0,
              trades_opened, trades_closed, trades_skipped, pnl_this_hour,
              cumulative, symbols_analyzed, market_context, decision_summary)
         )
 
-        return json.dumps({
-            "logged": True,
-            "log_id": str(row["id"]),
-            "timestamp": now.isoformat(),
-            "session": session,
-        })
+        return json.dumps({"logged": True, "log_id": str(row["id"]), "timestamp": now.isoformat(), "session": session})
 
     @mcp.tool()
     def get_daily_target_progress() -> str:
@@ -428,30 +446,27 @@ def register_database_tools(mcp):
             Target USD, progress by hour, current percentage.
         """
         today = datetime.now(timezone.utc).date()
+        s = _get_settings()
+        target_pct = float(s.get("daily_target_pct", 1.0))
 
-        # Get target pct from settings
-        setting = execute_one("SELECT value FROM trading_settings WHERE key = 'daily_target_pct'", ())
-        target_pct = float(setting["value"]) if setting else 1.0
+        # Get balance from bridge
+        from src.clients.mt5_bridge import bridge
+        account = bridge.get_account()
+        balance = account.get("balance", 10000) if "error" not in account else 10000
+        target_usd = balance * target_pct / 100
 
-        # Get hourly logs for today
+        # Hourly logs for today
         logs = execute(
-            """SELECT utc_hour, cumulative_pnl_today, trades_opened + trades_closed as trades
-            FROM hourly_logs WHERE timestamp::date = %s ORDER BY utc_hour""",
-            (today,)
+            "SELECT utc_hour, cumulative_pnl_today, trades_opened + trades_closed as trades FROM hourly_logs WHERE user_id = %s AND timestamp::date = %s ORDER BY utc_hour",
+            (USER_ID, today)
         )
 
-        # Get current PnL
+        # Current PnL
         daily_rows = execute(
-            "SELECT COALESCE(SUM(pnl_usd), 0) as total FROM trades WHERE status = 'closed' AND closed_at::date = %s",
-            (today,)
+            "SELECT COALESCE(SUM(pnl_usd), 0) as total FROM trades WHERE user_id = %s AND status = 'closed' AND closed_at::date = %s",
+            (USER_ID, today)
         )
         current_pnl = float(daily_rows[0]["total"]) if daily_rows else 0
-
-        # We don't have balance from MT5 yet, use a placeholder
-        # In production this comes from get_account_info()
-        balance_setting = execute_one("SELECT value FROM trading_settings WHERE key = 'min_balance_usd'", ())
-        estimated_balance = float(balance_setting["value"]) if balance_setting else 10000
-        target_usd = estimated_balance * target_pct / 100
 
         progress = []
         for log in logs:
