@@ -2,11 +2,6 @@
 |--------------------------------------------------------------------------
 | Environment variables service
 |--------------------------------------------------------------------------
-|
-| The `Env.create` method creates an instance of the Env service. The
-| service validates the environment variables and also cast values
-| to JavaScript data types.
-|
 */
 
 import { Env } from '@adonisjs/core/env'
@@ -32,17 +27,12 @@ export default await Env.create(new URL('../', import.meta.url), {
   DB_PASSWORD: Env.schema.string.optional(),
   DB_DATABASE: Env.schema.string(),
 
-  // Massive API (Forex Data Provider)
-  MASSIVE_API_KEY: Env.schema.string.optional(),
-  MASSIVE_BASE_URL: Env.schema.string({ format: 'url', tld: false }),
-
   // AWS Cognito
   COGNITO_USER_POOL_ID: Env.schema.string(),
   COGNITO_CLIENT_ID: Env.schema.string(),
 
-  // AWS Bedrock
+  // AWS
   AWS_REGION: Env.schema.string.optional(),
-  BEDROCK_MODEL_ID: Env.schema.string.optional(),
 
   // Frontend URL (CORS)
   FRONTEND_URL: Env.schema.string({ format: 'url', tld: false }),

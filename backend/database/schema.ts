@@ -7,139 +7,119 @@
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
-export class AlertSchema extends BaseModel {
-  static $columns = ['body', 'channel', 'createdAt', 'id', 'isRead', 'readAt', 'sentAt', 'signalId', 'title', 'userId'] as const
-  $columns = AlertSchema.$columns
+export class BrokerConfigSchema extends BaseModel {
+  static $columns = ['accountType', 'bridgeApiKeyEncrypted', 'bridgeUrl', 'brokerName', 'createdAt', 'id', 'isActive', 'lastConnectedAt', 'mt5Login', 'mt5PasswordEncrypted', 'mt5Server', 'symbolSuffix', 'updatedAt', 'userId'] as const
+  $columns = BrokerConfigSchema.$columns
   @column()
-  declare body: string | null
+  declare accountType: string
   @column()
-  declare channel: string
+  declare bridgeApiKeyEncrypted: string
+  @column()
+  declare bridgeUrl: string
+  @column()
+  declare brokerName: string
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column({ isPrimary: true })
-  declare id: number
+  declare id: string
   @column()
-  declare isRead: boolean
+  declare isActive: boolean
   @column.dateTime()
-  declare readAt: DateTime | null
-  @column.dateTime()
-  declare sentAt: DateTime
+  declare lastConnectedAt: DateTime | null
   @column()
-  declare signalId: string | null
+  declare mt5Login: number
   @column()
-  declare title: string
+  declare mt5PasswordEncrypted: string
+  @column()
+  declare mt5Server: string
+  @column()
+  declare symbolSuffix: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
   @column()
   declare userId: string
 }
 
-export class AnalysisSchema extends BaseModel {
-  static $columns = ['aiReasoning', 'createdAt', 'durationMs', 'executedAt', 'id', 'marketBias', 'newsSentiment', 'newsSummary', 'pairId', 'score', 'status', 'summary', 'timeframePrimary', 'timeframesAnalyzed', 'trendStrength', 'triggerType', 'userId'] as const
-  $columns = AnalysisSchema.$columns
+export class DailySummarySchema extends BaseModel {
+  static $columns = ['balanceEnd', 'balanceStart', 'bestTradeUsd', 'createdAt', 'date', 'id', 'maxDrawdownUsd', 'realizedPnl', 'targetReached', 'targetUsd', 'tradesLost', 'tradesTotal', 'tradesWon', 'userId', 'winRate', 'worstTradeUsd'] as const
+  $columns = DailySummarySchema.$columns
   @column()
-  declare aiReasoning: string | null
+  declare balanceEnd: string | null
+  @column()
+  declare balanceStart: string | null
+  @column()
+  declare bestTradeUsd: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
-  @column()
-  declare durationMs: number | null
-  @column.dateTime()
-  declare executedAt: DateTime
+  @column.date()
+  declare date: DateTime
   @column({ isPrimary: true })
   declare id: string
   @column()
-  declare marketBias: string | null
+  declare maxDrawdownUsd: string | null
   @column()
-  declare newsSentiment: string | null
+  declare realizedPnl: string | null
   @column()
-  declare newsSummary: string | null
+  declare targetReached: boolean
   @column()
-  declare pairId: number
+  declare targetUsd: string | null
   @column()
-  declare score: number | null
+  declare tradesLost: number
   @column()
-  declare status: string
+  declare tradesTotal: number
   @column()
-  declare summary: string | null
+  declare tradesWon: number
   @column()
-  declare timeframePrimary: string
+  declare userId: string
   @column()
-  declare timeframesAnalyzed: any
+  declare winRate: string | null
   @column()
-  declare trendStrength: number | null
-  @column()
-  declare triggerType: string
-  @column()
-  declare userId: string | null
+  declare worstTradeUsd: string | null
 }
 
-export class AnalysisIndicatorSchema extends BaseModel {
-  static $columns = ['analysisId', 'createdAt', 'extraValues', 'id', 'indicatorName', 'interpretation', 'timeframe', 'value'] as const
-  $columns = AnalysisIndicatorSchema.$columns
+export class HourlyLogSchema extends BaseModel {
+  static $columns = ['balanceUsd', 'createdAt', 'cumulativePnlToday', 'decisionSummary', 'equityUsd', 'id', 'marketContext', 'openPositions', 'pnlThisHour', 'session', 'symbolsAnalyzed', 'targetProgressPct', 'timestamp', 'tradesClosed', 'tradesOpened', 'tradesSkipped', 'userId', 'utcHour'] as const
+  $columns = HourlyLogSchema.$columns
   @column()
-  declare analysisId: string
+  declare balanceUsd: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()
-  declare extraValues: any | null
+  declare cumulativePnlToday: string | null
+  @column()
+  declare decisionSummary: string | null
+  @column()
+  declare equityUsd: string | null
   @column({ isPrimary: true })
-  declare id: number
+  declare id: string
   @column()
-  declare indicatorName: string
+  declare marketContext: string | null
   @column()
-  declare interpretation: string | null
+  declare openPositions: number
   @column()
-  declare timeframe: string
+  declare pnlThisHour: string | null
   @column()
-  declare value: string | null
-}
-
-export class AnalysisJobSchema extends BaseModel {
-  static $columns = ['createdAt', 'errorMessage', 'finishedAt', 'id', 'pairsAnalyzed', 'session', 'signalsGenerated', 'startedAt', 'status'] as const
-  $columns = AnalysisJobSchema.$columns
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
+  declare session: string | null
   @column()
-  declare errorMessage: string | null
+  declare symbolsAnalyzed: any | null
+  @column()
+  declare targetProgressPct: string | null
   @column.dateTime()
-  declare finishedAt: DateTime | null
-  @column({ isPrimary: true })
-  declare id: number
+  declare timestamp: DateTime
   @column()
-  declare pairsAnalyzed: any
+  declare tradesClosed: number
   @column()
-  declare session: string
+  declare tradesOpened: number
   @column()
-  declare signalsGenerated: number
-  @column.dateTime()
-  declare startedAt: DateTime
+  declare tradesSkipped: number
   @column()
-  declare status: string
-}
-
-export class EconomicEventSchema extends BaseModel {
-  static $columns = ['actual', 'createdAt', 'currency', 'eventAt', 'forecast', 'id', 'impact', 'previous', 'title'] as const
-  $columns = EconomicEventSchema.$columns
+  declare userId: string
   @column()
-  declare actual: string | null
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
-  @column()
-  declare currency: string
-  @column.dateTime()
-  declare eventAt: DateTime
-  @column()
-  declare forecast: string | null
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare impact: string
-  @column()
-  declare previous: string | null
-  @column()
-  declare title: string
+  declare utcHour: number
 }
 
 export class PairSchema extends BaseModel {
-  static $columns = ['baseCurrency', 'category', 'createdAt', 'id', 'isActive', 'massiveTicker', 'pipSize', 'pipValueUsd', 'quoteCurrency', 'sessions', 'spreadAvg', 'symbol'] as const
+  static $columns = ['baseCurrency', 'category', 'createdAt', 'id', 'isActive', 'pipSize', 'pipValueUsd', 'quoteCurrency', 'sessions', 'spreadAvg', 'symbol'] as const
   $columns = PairSchema.$columns
   @column()
   declare baseCurrency: string
@@ -151,8 +131,6 @@ export class PairSchema extends BaseModel {
   declare id: number
   @column()
   declare isActive: boolean
-  @column()
-  declare massiveTicker: string
   @column()
   declare pipSize: string
   @column()
@@ -167,140 +145,27 @@ export class PairSchema extends BaseModel {
   declare symbol: string
 }
 
-export class SignalConfluenceSchema extends BaseModel {
-  static $columns = ['createdAt', 'description', 'factorType', 'id', 'signalId', 'timeframe', 'weight'] as const
-  $columns = SignalConfluenceSchema.$columns
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
-  @column()
-  declare description: string
-  @column()
-  declare factorType: string
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare signalId: string
-  @column()
-  declare timeframe: string
-  @column()
-  declare weight: string
-}
-
-export class SignalSchema extends BaseModel {
-  static $columns = ['activatedAt', 'analysisId', 'classification', 'closePrice', 'closedAt', 'confluenceCount', 'createdAt', 'direction', 'entryPrice', 'expiresAt', 'id', 'invalidationLevel', 'lotSize', 'notes', 'pairId', 'pipsAtRisk', 'pipsToTp1', 'pipsToTp2', 'pipsToTp3', 'pnlMoney', 'pnlPips', 'riskPercent', 'riskReward', 'score', 'signalType', 'status', 'stopLoss', 'takeProfit1', 'takeProfit2', 'takeProfit3', 'timeframeAlignment', 'updatedAt', 'userId'] as const
-  $columns = SignalSchema.$columns
-  @column.dateTime()
-  declare activatedAt: DateTime | null
-  @column()
-  declare analysisId: string | null
-  @column()
-  declare classification: string
-  @column()
-  declare closePrice: string | null
-  @column.dateTime()
-  declare closedAt: DateTime | null
-  @column()
-  declare confluenceCount: number
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
-  @column()
-  declare direction: string
-  @column()
-  declare entryPrice: string
-  @column.dateTime()
-  declare expiresAt: DateTime | null
-  @column({ isPrimary: true })
-  declare id: string
-  @column()
-  declare invalidationLevel: string | null
-  @column()
-  declare lotSize: string
-  @column()
-  declare notes: string | null
-  @column()
-  declare pairId: number
-  @column()
-  declare pipsAtRisk: string
-  @column()
-  declare pipsToTp1: string
-  @column()
-  declare pipsToTp2: string | null
-  @column()
-  declare pipsToTp3: string | null
-  @column()
-  declare pnlMoney: string | null
-  @column()
-  declare pnlPips: string | null
-  @column()
-  declare riskPercent: string
-  @column()
-  declare riskReward: string
-  @column()
-  declare score: number
-  @column()
-  declare signalType: string
-  @column()
-  declare status: string
-  @column()
-  declare stopLoss: string
-  @column()
-  declare takeProfit1: string
-  @column()
-  declare takeProfit2: string | null
-  @column()
-  declare takeProfit3: string | null
-  @column()
-  declare timeframeAlignment: any | null
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime | null
-  @column()
-  declare userId: string
-}
-
-export class TradePartialSchema extends BaseModel {
-  static $columns = ['closePrice', 'closedAt', 'id', 'level', 'percentage', 'pnlMoney', 'pnlPips', 'tradeId'] as const
-  $columns = TradePartialSchema.$columns
-  @column()
-  declare closePrice: string
-  @column.dateTime()
-  declare closedAt: DateTime
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare level: string
-  @column()
-  declare percentage: string
-  @column()
-  declare pnlMoney: string
-  @column()
-  declare pnlPips: string
-  @column()
-  declare tradeId: string
-}
-
 export class TradeSchema extends BaseModel {
-  static $columns = ['brokerOrderId', 'closePrice', 'closeReason', 'closedAt', 'commission', 'createdAt', 'currentSl', 'direction', 'entryPrice', 'executionType', 'id', 'lotSize', 'openedAt', 'pairId', 'pnlMoney', 'pnlPips', 'riskPercent', 'signalId', 'status', 'stopLoss', 'swap', 'takeProfit1', 'takeProfit2', 'takeProfit3', 'updatedAt', 'userId'] as const
+  static $columns = ['closeReason', 'closedAt', 'comment', 'commission', 'createdAt', 'entryPrice', 'exitPrice', 'holdingMinutes', 'hourlyLogId', 'id', 'lotSize', 'openedAt', 'pairId', 'pnlPips', 'pnlUsd', 'riskUsd', 'rrAchieved', 'rrRatio', 'side', 'slPips', 'slPrice', 'status', 'swap', 'ticket', 'tpPips', 'tpPrice', 'updatedAt', 'userId'] as const
   $columns = TradeSchema.$columns
-  @column()
-  declare brokerOrderId: string | null
-  @column()
-  declare closePrice: string | null
   @column()
   declare closeReason: string | null
   @column.dateTime()
   declare closedAt: DateTime | null
   @column()
+  declare comment: string | null
+  @column()
   declare commission: string | null
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()
-  declare currentSl: string
-  @column()
-  declare direction: string
-  @column()
   declare entryPrice: string
   @column()
-  declare executionType: string
+  declare exitPrice: string | null
+  @column()
+  declare holdingMinutes: string | null
+  @column()
+  declare hourlyLogId: string | null
   @column({ isPrimary: true })
   declare id: string
   @column()
@@ -310,60 +175,84 @@ export class TradeSchema extends BaseModel {
   @column()
   declare pairId: number
   @column()
-  declare pnlMoney: string | null
-  @column()
   declare pnlPips: string | null
   @column()
-  declare riskPercent: string
+  declare pnlUsd: string | null
   @column()
-  declare signalId: string | null
+  declare riskUsd: string
+  @column()
+  declare rrAchieved: string | null
+  @column()
+  declare rrRatio: string
+  @column()
+  declare side: string
+  @column()
+  declare slPips: string
+  @column()
+  declare slPrice: string
   @column()
   declare status: string
   @column()
-  declare stopLoss: string
-  @column()
   declare swap: string | null
   @column()
-  declare takeProfit1: string
+  declare ticket: bigint | number | null
   @column()
-  declare takeProfit2: string | null
+  declare tpPips: string
   @column()
-  declare takeProfit3: string | null
+  declare tpPrice: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
   @column()
   declare userId: string
 }
 
-export class UserSettingSchema extends BaseModel {
-  static $columns = ['alertChannels', 'brokerConfig', 'createdAt', 'id', 'maxDailyDrawdown', 'maxOpenPositions', 'maxRiskPerTrade', 'maxWeeklyDrawdown', 'minSignalClass', 'minSignalScore', 'preferredPairs', 'preferredSessions', 'timezone', 'updatedAt', 'userId'] as const
-  $columns = UserSettingSchema.$columns
+export class TradingSettingSchema extends BaseModel {
+  static $columns = ['allowedPairs', 'autoTradingEnabled', 'createdAt', 'dailyTargetPct', 'defaultLotSize', 'id', 'killSwitch', 'maxConsecutiveLosses', 'maxDailyLossPct', 'maxDrawdownPct', 'maxLotSize', 'maxOpenPositions', 'maxRiskPerTradePct', 'maxSpreadPips', 'maxTradeDurationMinutes', 'minAdxEntry', 'minAlignmentScore', 'minRrRatio', 'newsBufferMinutes', 'reduceLotAtPct', 'tradingEndUtc', 'tradingStartUtc', 'updatedAt', 'userId'] as const
+  $columns = TradingSettingSchema.$columns
   @column()
-  declare alertChannels: any
+  declare allowedPairs: any
   @column()
-  declare brokerConfig: any | null
+  declare autoTradingEnabled: boolean
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
-  @column({ isPrimary: true })
-  declare id: number
   @column()
-  declare maxDailyDrawdown: string
+  declare dailyTargetPct: string
+  @column()
+  declare defaultLotSize: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare killSwitch: boolean
+  @column()
+  declare maxConsecutiveLosses: number
+  @column()
+  declare maxDailyLossPct: string
+  @column()
+  declare maxDrawdownPct: string
+  @column()
+  declare maxLotSize: string
   @column()
   declare maxOpenPositions: number
   @column()
-  declare maxRiskPerTrade: string
+  declare maxRiskPerTradePct: string
   @column()
-  declare maxWeeklyDrawdown: string
+  declare maxSpreadPips: string
   @column()
-  declare minSignalClass: string
+  declare maxTradeDurationMinutes: number
   @column()
-  declare minSignalScore: number
+  declare minAdxEntry: number
   @column()
-  declare preferredPairs: any
+  declare minAlignmentScore: number
   @column()
-  declare preferredSessions: any
+  declare minRrRatio: string
   @column()
-  declare timezone: string
+  declare newsBufferMinutes: number
+  @column()
+  declare reduceLotAtPct: number
+  @column()
+  declare tradingEndUtc: string
+  @column()
+  declare tradingStartUtc: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
   @column()
