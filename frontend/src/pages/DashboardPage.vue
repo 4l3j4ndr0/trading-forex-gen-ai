@@ -1,5 +1,19 @@
 <template>
   <q-page padding>
+    <!-- Account Type Banner -->
+    <q-banner v-if="store.accountType === 'demo'" class="bg-orange-1 text-orange-9 q-mb-md" rounded>
+      <template #avatar><q-icon name="science" color="orange" /></template>
+      <strong>Cuenta DEMO</strong> — Operando con dinero virtual. Los resultados no son reales.
+    </q-banner>
+    <q-banner v-else-if="store.accountType === 'live'" class="bg-green-1 text-green-9 q-mb-md" rounded>
+      <template #avatar><q-icon name="account_balance" color="green" /></template>
+      <strong>Cuenta REAL</strong> — Operando con dinero real. Ten precaución.
+    </q-banner>
+    <q-banner v-else-if="store.accountType === 'unknown'" class="bg-grey-2 text-grey-7 q-mb-md" rounded>
+      <template #avatar><q-icon name="link_off" color="grey" /></template>
+      <strong>Sin conexión al broker</strong> — Configura tu cuenta en Settings.
+    </q-banner>
+
     <!-- Header Cards -->
     <div class="row q-col-gutter-md q-mb-lg">
       <div class="col-12 col-sm-6 col-md-3">

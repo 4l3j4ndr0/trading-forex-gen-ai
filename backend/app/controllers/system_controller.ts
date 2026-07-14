@@ -43,12 +43,35 @@ export default class SystemController {
       .sum('pnl_usd as total')
       .first()
 
+    // Get live balance from bridge
+    const bridgeUrl = env.get('MT5_BRIDGE_URL')
+    const bridgeApiKey = env.get('MT5_BRIDGE_API_KEY')
+    let balance = 0
+    let equity = 0
+    let accountType = 'unknown'
+
+    try {
+      const res = await fetch(`${bridgeUrl}/account`, {
+        headers: { 'X-Bridge-Api-Key': bridgeApiKey, 'X-User-Id': cognito.user.id },
+        signal: AbortSignal.timeout(5000),
+      })
+      const data = (await res.json()) as Record<string, unknown>
+      if (!('error' in data)) {
+        balance = data.balance as number
+        equity = data.equity as number
+        accountType = (data.trade_mode as number) === 0 ? 'demo' : 'live'
+      }
+    } catch { /* bridge unreachable */ }
+
     return response.ok({
       data: {
         killSwitch: settings?.kill_switch || false,
         autoTradingEnabled: settings?.auto_trading_enabled || false,
         openPositions: Number(openTrades?.cnt || 0),
         dailyPnl: Number(todayPnl?.total || 0),
+        balance,
+        equity,
+        accountType,
       },
     })
   }

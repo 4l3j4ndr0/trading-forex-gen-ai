@@ -51,6 +51,7 @@ export const useTradingStore = defineStore('trading', {
     openPositions: 0,
     killSwitch: false,
     autoTrading: true,
+    accountType: 'unknown',
     openTrades: [] as Trade[],
     tradeHistory: [] as Trade[],
     dailySummary: null as DailySummary | null,
@@ -64,7 +65,7 @@ export const useTradingStore = defineStore('trading', {
       this.loading = true
       try {
         const [status, today, open] = await Promise.all([
-          api.get<{ data: { killSwitch: boolean; autoTradingEnabled: boolean; openPositions: number; dailyPnl: number } }>('/system/status'),
+          api.get<{ data: { killSwitch: boolean; autoTradingEnabled: boolean; openPositions: number; dailyPnl: number; balance: number; equity: number; accountType: string } }>('/system/status'),
           api.get<{ data: DailySummary }>('/daily/today'),
           api.get<{ data: Trade[] }>('/trades/open'),
         ])
@@ -73,6 +74,9 @@ export const useTradingStore = defineStore('trading', {
         this.autoTrading = status.data.autoTradingEnabled
         this.openPositions = status.data.openPositions
         this.dailyPnl = status.data.dailyPnl
+        this.balance = status.data.balance
+        this.equity = status.data.equity
+        this.accountType = status.data.accountType
         this.dailySummary = today.data
         this.openTrades = open.data
       } catch (e) {

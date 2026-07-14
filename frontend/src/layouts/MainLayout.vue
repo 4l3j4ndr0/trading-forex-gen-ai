@@ -13,6 +13,12 @@
           {{ systemStatus }}
         </q-chip>
 
+        <q-chip v-if="tradingStore.accountType !== 'unknown'" dense
+          :color="tradingStore.accountType === 'demo' ? 'orange-8' : 'green-8'"
+          text-color="white" class="q-mr-sm">
+          {{ tradingStore.accountType.toUpperCase() }}
+        </q-chip>
+
         <q-btn flat round icon="logout" @click="logout" />
       </q-toolbar>
     </q-header>
