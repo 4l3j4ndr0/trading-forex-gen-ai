@@ -61,6 +61,17 @@
                 <q-input v-model="settings.tradingEndUtc" outlined dense label="Fin (UTC)" class="col" />
               </div>
 
+              <div class="text-caption text-grey q-mt-md">Pares a Operar</div>
+              <q-select
+                v-model="settings.allowedPairs"
+                :options="availablePairs"
+                multiple
+                outlined
+                dense
+                use-chips
+                label="Pares permitidos"
+              />
+
               <div class="text-caption text-grey q-mt-md">Sistema</div>
               <q-toggle v-model="settings.killSwitch" label="Kill Switch (pausar trading)" color="red" />
               <q-toggle v-model="settings.autoTradingEnabled" label="Auto Trading habilitado" color="green" />
@@ -103,9 +114,12 @@ const settings = reactive({
   dailyTargetPct: 1.0,
   tradingStartUtc: '07:00',
   tradingEndUtc: '21:00',
+  allowedPairs: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'EURGBP'] as string[],
   killSwitch: false,
   autoTradingEnabled: true,
 })
+
+const availablePairs = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'EURGBP', 'NZDUSD', 'USDCHF']
 
 const savingBroker = ref(false)
 const testingBroker = ref(false)
@@ -149,6 +163,9 @@ async function loadSettings() {
     if (d.system) {
       settings.killSwitch = d.system.killSwitch as boolean
       settings.autoTradingEnabled = d.system.autoTradingEnabled as boolean
+    }
+    if (d.pairs) {
+      settings.allowedPairs = (d.pairs.allowedPairs as string[]) || []
     }
   } catch { /* defaults */ }
 }
