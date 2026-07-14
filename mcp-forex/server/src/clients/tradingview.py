@@ -1,5 +1,6 @@
 """TradingView Technical Analysis wrapper for Forex."""
 
+import time
 from tradingview_ta import TA_Handler, Interval
 
 INTERVAL_MAP = {
@@ -10,6 +11,20 @@ INTERVAL_MAP = {
     "1d": Interval.INTERVAL_1_DAY,
     "1w": Interval.INTERVAL_1_WEEK,
 }
+
+# Rate limiting — max 1 request per second
+_last_request_time = 0.0
+_MIN_INTERVAL = 1.0  # seconds between requests
+
+
+def _rate_limit():
+    """Ensure minimum interval between TradingView requests."""
+    global _last_request_time
+    now = time.time()
+    elapsed = now - _last_request_time
+    if elapsed < _MIN_INTERVAL:
+        time.sleep(_MIN_INTERVAL - elapsed)
+    _last_request_time = time.time()
 
 
 def get_analysis(symbol: str, timeframe: str = "1h") -> dict:
@@ -28,6 +43,7 @@ def get_analysis(symbol: str, timeframe: str = "1h") -> dict:
         return {"error": f"Invalid timeframe '{timeframe}'. Use: {list(INTERVAL_MAP.keys())}"}
 
     try:
+        _rate_limit()
         handler = TA_Handler(
             symbol=symbol,
             screener="forex",
@@ -53,13 +69,14 @@ def get_analysis(symbol: str, timeframe: str = "1h") -> dict:
         strength = "WEAK"
 
     # EMA trend
-    ema_8 = indicators.get("EMA8")
-    ema_21 = indicators.get("EMA21")
+    ema_10 = indicators.get("EMA10")
+    ema_20 = indicators.get("EMA20")
     ema_50 = indicators.get("EMA50")
-    if ema_8 and ema_21 and ema_50:
-        if ema_8 > ema_21 > ema_50:
+    ema_200 = indicators.get("EMA200")
+    if ema_10 and ema_20 and ema_50:
+        if ema_10 > ema_20 > ema_50:
             ema_trend = "BULLISH"
-        elif ema_8 < ema_21 < ema_50:
+        elif ema_10 < ema_20 < ema_50:
             ema_trend = "BEARISH"
         else:
             ema_trend = "FLAT"
@@ -77,20 +94,26 @@ def get_analysis(symbol: str, timeframe: str = "1h") -> dict:
         },
         "indicators": {
             "rsi_14": round(indicators.get("RSI", 0), 2),
-            "macd_histogram": round(indicators.get("MACD.macd", 0) - indicators.get("MACD.signal", 0), 6),
-            "macd_signal": round(indicators.get("MACD.signal", 0), 6),
-            "adx_14": round(indicators.get("ADX", 0), 2),
-            "atr_14": round(indicators.get("ATR", 0), 6),
-            "ema_8": ema_8,
-            "ema_21": ema_21,
+            "macd_histogram": round((indicators.get("MACD.macd", 0) or 0) - (indicators.get("MACD.signal", 0) or 0), 6),
+            "macd_signal": round(indicators.get("MACD.signal", 0) or 0, 6),
+            "adx_14": round(indicators.get("ADX", 0) or 0, 2),
+            "adx_plus_di": round(indicators.get("ADX+DI", 0) or 0, 2),
+            "adx_minus_di": round(indicators.get("ADX-DI", 0) or 0, 2),
+            "ema_10": ema_10,
+            "ema_20": ema_20,
             "ema_50": ema_50,
-            "ema_200": indicators.get("EMA200"),
+            "ema_100": indicators.get("EMA100"),
+            "ema_200": ema_200,
+            "sma_20": indicators.get("SMA20"),
+            "sma_50": indicators.get("SMA50"),
+            "sma_200": indicators.get("SMA200"),
             "bb_upper": indicators.get("BB.upper"),
             "bb_lower": indicators.get("BB.lower"),
-            "stoch_k": round(indicators.get("Stoch.K", 0), 2),
-            "stoch_d": round(indicators.get("Stoch.D", 0), 2),
-            "cci_20": round(indicators.get("CCI20", 0), 2),
-            "volume": indicators.get("volume"),
+            "stoch_k": round(indicators.get("Stoch.K", 0) or 0, 2),
+            "stoch_d": round(indicators.get("Stoch.D", 0) or 0, 2),
+            "cci_20": round(indicators.get("CCI20", 0) or 0, 2),
+            "ao": indicators.get("AO"),
+            "momentum": indicators.get("Mom"),
         },
         "moving_averages": {
             "recommendation": summary.get("RECOMMENDATION", "NEUTRAL"),
