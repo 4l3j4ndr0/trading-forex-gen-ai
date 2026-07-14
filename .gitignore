@@ -41,3 +41,6 @@ coverage/
 
 # PDF research docs (large files)
 *.pdf
+windows.pem
+*.pem
+mcp-trading-chat.json
