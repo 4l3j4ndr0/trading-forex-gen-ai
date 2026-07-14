@@ -42,23 +42,41 @@ def register_smart_tools(mcp):
             risk_pct = _get_setting_float("max_risk_per_trade_pct", 1.0)
 
         max_lot = _get_setting_float("max_lot_size", 0.50)
-        default_lot = _get_setting_float("default_lot_size", 0.05)
 
-        # Pip values per standard lot (1.0) for common pairs
-        # For pairs where USD is quote currency: pip_value = $10 per lot
-        # For USDJPY: pip_value ≈ $6.70 per lot (varies with price)
-        pip_values = {
-            "EURUSD": 10.0,
-            "GBPUSD": 10.0,
-            "AUDUSD": 10.0,
-            "NZDUSD": 10.0,
-            "USDCAD": 7.50,  # approximate
-            "USDCHF": 10.50,  # approximate
-            "USDJPY": 6.70,  # approximate
-            "EURGBP": 12.50,  # approximate (depends on GBPUSD rate)
-        }
+        # Get current price to calculate pip value dynamically
+        from src.clients.tradingview import get_analysis
+        analysis = get_analysis(symbol, "1h")
+        if "error" in analysis:
+            return json.dumps({"error": f"Cannot get price for {symbol}: {analysis['error']}"})
 
-        pip_value = pip_values.get(symbol, 10.0)
+        close = analysis["price"]["close"]
+        if not close:
+            return json.dumps({"error": "Price data unavailable"})
+
+        # Calculate pip value per standard lot (100,000 units)
+        # For pairs where USD is quote (EURUSD, GBPUSD, AUDUSD, NZDUSD):
+        #   pip_value = 0.0001 × 100,000 = $10
+        # For pairs where USD is base (USDCAD, USDCHF, USDJPY):
+        #   pip_value = pip_size × 100,000 / current_price
+        # For crosses (EURGBP):
+        #   pip_value = 0.0001 × 100,000 / GBPUSD_rate (approx)
+
+        if "JPY" in symbol:
+            pip_size = 0.01
+        else:
+            pip_size = 0.0001
+
+        quote_currency = symbol[3:]  # Last 3 chars
+
+        if quote_currency == "USD":
+            # EURUSD, GBPUSD, AUDUSD — pip value is always $10
+            pip_value = pip_size * 100000
+        elif symbol[:3] == "USD":
+            # USDJPY, USDCAD, USDCHF — pip value varies with price
+            pip_value = pip_size * 100000 / close
+        else:
+            # Crosses (EURGBP, etc) — approximate using $10 adjusted
+            pip_value = pip_size * 100000 / close if close > 2 else pip_size * 100000
 
         # Use min_balance as estimate (in production, comes from MT5)
         balance = _get_setting_float("min_balance_usd", 10000.0)
@@ -85,16 +103,16 @@ def register_smart_tools(mcp):
 
         return json.dumps({
             "symbol": symbol,
+            "current_price": close,
             "balance": balance,
             "risk_pct": risk_pct,
             "risk_usd": round(risk_usd, 2),
             "sl_pips": sl_pips,
-            "pip_value_per_lot": pip_value,
+            "pip_value_per_lot": round(pip_value, 2),
             "calculated_lot": round(calculated_lot, 4),
             "adjusted_lot": adjusted_lot,
             "max_allowed_lot": max_lot,
             "margin_required_estimate": round(margin_required, 2),
-            "note": f"Lot adjusted to 0.01 step. Max: {max_lot}" if calculated_lot != adjusted_lot else "OK",
         })
 
     @mcp.tool()
