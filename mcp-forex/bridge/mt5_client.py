@@ -5,6 +5,22 @@ import MetaTrader5 as mt5
 from config import Config
 
 
+def _sym(symbol: str) -> str:
+    """Add broker suffix to symbol. EURUSD → EURUSD#"""
+    suffix = Config.SYMBOL_SUFFIX
+    if suffix and not symbol.endswith(suffix):
+        return symbol + suffix
+    return symbol
+
+
+def _clean_sym(symbol: str) -> str:
+    """Remove broker suffix from symbol. EURUSD# → EURUSD"""
+    suffix = Config.SYMBOL_SUFFIX
+    if suffix and symbol.endswith(suffix):
+        return symbol[:-len(suffix)]
+    return symbol
+
+
 class MT5Client:
     """Wrapper around the MetaTrader5 Python library."""
 
@@ -74,7 +90,7 @@ class MT5Client:
         for pos in positions:
             result.append({
                 "ticket": pos.ticket,
-                "symbol": pos.symbol,
+                "symbol": _clean_sym(pos.symbol),
                 "side": "BUY" if pos.type == mt5.ORDER_TYPE_BUY else "SELL",
                 "lot_size": pos.volume,
                 "entry_price": pos.price_open,
@@ -92,30 +108,31 @@ class MT5Client:
     def get_symbol_info(self, symbol: str) -> dict:
         """Get symbol details: spread, pip value, lot sizes."""
         self._ensure_connected()
-        info = mt5.symbol_info(symbol)
+        mt5_sym = _sym(symbol)
+        info = mt5.symbol_info(mt5_sym)
 
         if info is None:
-            return {"error": f"Symbol '{symbol}' not found"}
+            return {"error": f"Symbol '{symbol}' not found (tried {mt5_sym})"}
 
         # Ensure symbol is visible in Market Watch
         if not info.visible:
-            mt5.symbol_select(symbol, True)
-            info = mt5.symbol_info(symbol)
+            mt5.symbol_select(mt5_sym, True)
+            info = mt5.symbol_info(mt5_sym)
 
-        tick = mt5.symbol_info_tick(symbol)
+        tick = mt5.symbol_info_tick(mt5_sym)
         spread_points = info.spread if info.spread else (tick.ask - tick.bid) / info.point if tick else 0
 
         return {
             "symbol": symbol,
             "spread_points": spread_points,
             "spread_pips": round(spread_points * info.point / (0.01 if "JPY" in symbol else 0.0001), 1),
-            "pip_value": info.trade_tick_value,  # Value of 1 point movement per lot
+            "pip_value": info.trade_tick_value,
             "min_lot": info.volume_min,
             "max_lot": info.volume_max,
             "lot_step": info.volume_step,
             "digits": info.digits,
             "point": info.point,
-            "trade_allowed": info.trade_mode != 0,
+            "trade_allowed": info.trade_mode == 4,
             "bid": tick.bid if tick else 0,
             "ask": tick.ask if tick else 0,
         }
@@ -123,9 +140,10 @@ class MT5Client:
     def open_order(self, symbol: str, side: str, lot: float, sl: float, tp: float, comment: str = "") -> dict:
         """Open a market order."""
         self._ensure_connected()
+        mt5_sym = _sym(symbol)
 
         # Get current price
-        tick = mt5.symbol_info_tick(symbol)
+        tick = mt5.symbol_info_tick(mt5_sym)
         if tick is None:
             return {"error": f"Cannot get price for {symbol}"}
 
@@ -134,7 +152,7 @@ class MT5Client:
 
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": symbol,
+            "symbol": mt5_sym,
             "volume": lot,
             "type": order_type,
             "price": price,
@@ -268,19 +286,20 @@ class MT5Client:
     def get_candles(self, symbol: str, timeframe: str = "H1", count: int = 100) -> list | dict:
         """Get OHLCV candles from MT5."""
         self._ensure_connected()
+        mt5_sym = _sym(symbol)
 
         tf = self.TIMEFRAME_MAP.get(timeframe)
         if tf is None:
             return {"error": f"Invalid timeframe '{timeframe}'. Use: {list(self.TIMEFRAME_MAP.keys())}"}
 
         # Ensure symbol is in Market Watch
-        info = mt5.symbol_info(symbol)
+        info = mt5.symbol_info(mt5_sym)
         if info is None:
             return {"error": f"Symbol '{symbol}' not found"}
         if not info.visible:
-            mt5.symbol_select(symbol, True)
+            mt5.symbol_select(mt5_sym, True)
 
-        rates = mt5.copy_rates_from_pos(symbol, tf, 0, count)
+        rates = mt5.copy_rates_from_pos(mt5_sym, tf, 0, count)
         if rates is None or len(rates) == 0:
             return {"error": f"No candle data for {symbol} {timeframe}"}
 
@@ -351,12 +370,13 @@ class MT5Client:
     def get_spread(self, symbol: str) -> dict:
         """Get current real-time spread."""
         self._ensure_connected()
+        mt5_sym = _sym(symbol)
 
-        info = mt5.symbol_info(symbol)
+        info = mt5.symbol_info(mt5_sym)
         if info is None:
             return {"error": f"Symbol '{symbol}' not found"}
 
-        tick = mt5.symbol_info_tick(symbol)
+        tick = mt5.symbol_info_tick(mt5_sym)
         if tick is None:
             return {"error": f"Cannot get tick for {symbol}"}
 
@@ -382,8 +402,9 @@ class MT5Client:
     def get_tick(self, symbol: str) -> dict:
         """Get current bid/ask."""
         self._ensure_connected()
+        mt5_sym = _sym(symbol)
 
-        tick = mt5.symbol_info_tick(symbol)
+        tick = mt5.symbol_info_tick(mt5_sym)
         if tick is None:
             return {"error": f"Cannot get tick for {symbol}"}
 

@@ -10,6 +10,9 @@ class Config:
     MT5_SERVER = os.getenv("MT5_SERVER", "XMGlobal-MT5")
     MT5_PATH = os.getenv("MT5_PATH", r"C:\Program Files\MetaTrader 5\terminal64.exe")
 
+    # Symbol suffix (XM uses # for some account types)
+    SYMBOL_SUFFIX = os.getenv("SYMBOL_SUFFIX", "#")
+
     # Bridge
     BRIDGE_PORT = int(os.getenv("BRIDGE_PORT", "5000"))
     BRIDGE_API_KEY = os.getenv("BRIDGE_API_KEY", "change-me-in-production")
