@@ -29,7 +29,7 @@ class SafetyRules:
     """Hard safety limits — enforced at tool level, cannot be overridden by any client."""
 
     max_open_positions: int = field(default_factory=lambda: int(os.getenv("MAX_OPEN_POSITIONS", "3")))
-    max_lot_size: float = field(default_factory=lambda: float(os.getenv("MAX_LOT_SIZE", "0.05")))
+    max_lot_size: float = field(default_factory=lambda: float(os.getenv("MAX_LOT_SIZE", "500.0")))
     max_daily_loss_usd: float = field(default_factory=lambda: float(os.getenv("MAX_DAILY_LOSS_USD", "50.0")))
     max_consecutive_losses: int = field(default_factory=lambda: int(os.getenv("MAX_CONSECUTIVE_LOSSES", "5")))
     min_balance_usd: float = field(default_factory=lambda: float(os.getenv("MIN_BALANCE_USD", "100.0")))

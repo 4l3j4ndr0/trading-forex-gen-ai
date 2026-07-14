@@ -49,10 +49,11 @@ class SafetyGuard:
         """Return current safety rules as a dict."""
         return {
             "max_open_positions": safety.max_open_positions,
-            "max_lot_size": safety.max_lot_size,
+            "max_lot_size_usd": safety.max_lot_size,
             "max_daily_loss_usd": safety.max_daily_loss_usd,
             "max_consecutive_losses": safety.max_consecutive_losses,
             "min_balance_usd": safety.min_balance_usd,
             "allowed_symbols": safety.allowed_symbols,
             "kill_switch": safety.kill_switch,
+            "note": "lot_size is in USD. Binance minimum notional is $50.",
         }

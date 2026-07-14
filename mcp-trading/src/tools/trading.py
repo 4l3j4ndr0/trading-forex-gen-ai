@@ -12,14 +12,14 @@ def register_trading_tools(mcp):
     """Register all trading execution tools."""
 
     @mcp.tool()
-    def open_position(symbol: str, side: str, lot_size: float = 0.01) -> str:
+    def open_position(symbol: str, side: str, lot_size: float = 50.0) -> str:
         """
         Open a position on Binance Futures with safety validation.
 
         Args:
             symbol: 'BTCUSDT' or 'ETHUSDT'
             side: 'BUY' (long) or 'SELL' (short)
-            lot_size: Position size in USD-equivalent (default 0.01)
+            lot_size: Position size in USD (default 50). Min 50 USD (Binance requirement). Max defined by safety rules.
 
         Returns:
             Order confirmation with trade_id, entry price, and close_by time.
