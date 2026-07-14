@@ -13,9 +13,16 @@ mt5 = MT5Client()
 
 
 def require_api_key(f):
-    """Validate API key from header."""
+    """Validate API key and IP whitelist."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # IP whitelist
+        if Config.ALLOWED_IPS and Config.ALLOWED_IPS[0]:
+            client_ip = request.remote_addr
+            if client_ip not in Config.ALLOWED_IPS:
+                return jsonify({"error": f"IP {client_ip} not allowed"}), 403
+
+        # API key
         key = request.headers.get("X-Bridge-Api-Key", "")
         if key != Config.BRIDGE_API_KEY:
             return jsonify({"error": "Invalid API key"}), 401
