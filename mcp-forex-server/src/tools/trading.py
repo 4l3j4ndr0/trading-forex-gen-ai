@@ -365,15 +365,22 @@ def register_trading_tools(mcp):
         if "error" in result:
             return json.dumps(result)
 
+        # MT5 returns margin_level=0 when no positions are open (no margin used)
+        # Interpret as "infinite" margin level (no risk)
+        margin_level = result["margin_level"]
+        if result["margin"] == 0:
+            margin_level = 99999.0  # No positions = unlimited margin
+
         return json.dumps({
             "balance": result["balance"],
             "equity": result["equity"],
             "margin_used": result["margin"],
             "free_margin": result["free_margin"],
-            "margin_level_pct": result["margin_level"],
+            "margin_level_pct": margin_level,
             "leverage": result["leverage"],
             "currency": result["currency"],
             "account_type": "demo" if result.get("trade_mode") == 0 else "live",
+            "has_open_positions": result["margin"] > 0,
         })
 
     @mcp.tool()
