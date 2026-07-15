@@ -57,8 +57,34 @@
 
               <div class="text-caption text-grey q-mt-md">Sesión</div>
               <div class="row q-gutter-sm">
-                <q-input v-model="settings.tradingStartUtc" outlined dense label="Inicio (UTC)" class="col" />
-                <q-input v-model="settings.tradingEndUtc" outlined dense label="Fin (UTC)" class="col" />
+                <q-input
+                  v-model="settings.tradingStartUtc"
+                  outlined
+                  dense
+                  label="Inicio (UTC)"
+                  class="col"
+                  mask="##:##"
+                  placeholder="07:00"
+                  hint="Formato HH:mm"
+                >
+                  <template #prepend>
+                    <q-icon name="schedule" />
+                  </template>
+                </q-input>
+                <q-input
+                  v-model="settings.tradingEndUtc"
+                  outlined
+                  dense
+                  label="Fin (UTC)"
+                  class="col"
+                  mask="##:##"
+                  placeholder="20:00"
+                  hint="Formato HH:mm"
+                >
+                  <template #prepend>
+                    <q-icon name="schedule" />
+                  </template>
+                </q-input>
               </div>
 
               <div class="text-caption text-grey q-mt-md">Pares a Operar</div>
