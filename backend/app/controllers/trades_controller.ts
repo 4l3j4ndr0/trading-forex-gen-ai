@@ -5,30 +5,48 @@ export default class TradesController {
   async index({ cognito, request, response }: HttpContext) {
     const { status, symbol, period, page = 1, limit = 20 } = request.qs()
 
-    let query = db.from('trades').where('user_id', cognito.user.id)
+    let query = db
+      .from('trades')
+      .join('pairs', 'trades.pair_id', 'pairs.id')
+      .where('trades.user_id', cognito.user.id)
+      .select(
+        'trades.*',
+        'pairs.symbol as symbol'
+      )
 
-    if (status) query = query.where('status', status)
-    if (symbol) {
-      const pair = await db.from('pairs').where('symbol', symbol).first()
-      if (pair) query = query.where('pair_id', pair.id)
-    }
+    if (status) query = query.where('trades.status', status)
+    if (symbol) query = query.where('pairs.symbol', symbol)
+
     if (period === 'today') {
-      query = query.whereRaw("closed_at::date = CURRENT_DATE")
+      query = query.whereRaw(
+        "(trades.opened_at::date = CURRENT_DATE OR trades.closed_at::date = CURRENT_DATE)"
+      )
     } else if (period === '7d') {
-      query = query.whereRaw("closed_at >= NOW() - INTERVAL '7 days'")
+      query = query.whereRaw("trades.opened_at >= NOW() - INTERVAL '7 days'")
     } else if (period === '30d') {
-      query = query.whereRaw("closed_at >= NOW() - INTERVAL '30 days'")
+      query = query.whereRaw("trades.opened_at >= NOW() - INTERVAL '30 days'")
     }
+
+    const countQuery = db
+      .from('trades')
+      .where('user_id', cognito.user.id)
+
+    if (period === 'today') {
+      countQuery.whereRaw(
+        "(opened_at::date = CURRENT_DATE OR closed_at::date = CURRENT_DATE)"
+      )
+    } else if (period === '7d') {
+      countQuery.whereRaw("opened_at >= NOW() - INTERVAL '7 days'")
+    } else if (period === '30d') {
+      countQuery.whereRaw("opened_at >= NOW() - INTERVAL '30 days'")
+    }
+
+    const countResult = await countQuery.count('* as total').first()
 
     const trades = await query
-      .orderBy('opened_at', 'desc')
+      .orderBy('trades.opened_at', 'desc')
       .offset((Number(page) - 1) * Number(limit))
       .limit(Number(limit))
-
-    const countResult = await db.from('trades')
-      .where('user_id', cognito.user.id)
-      .count('* as total')
-      .first()
 
     return response.ok({
       data: trades,
@@ -39,9 +57,11 @@ export default class TradesController {
   async open({ cognito, response }: HttpContext) {
     const trades = await db
       .from('trades')
-      .where('user_id', cognito.user.id)
-      .where('status', 'open')
-      .orderBy('opened_at', 'desc')
+      .join('pairs', 'trades.pair_id', 'pairs.id')
+      .where('trades.user_id', cognito.user.id)
+      .where('trades.status', 'open')
+      .select('trades.*', 'pairs.symbol as symbol')
+      .orderBy('trades.opened_at', 'desc')
 
     return response.ok({ data: trades })
   }
@@ -49,8 +69,10 @@ export default class TradesController {
   async show({ cognito, params, response }: HttpContext) {
     const trade = await db
       .from('trades')
-      .where('user_id', cognito.user.id)
-      .where('id', params.id)
+      .join('pairs', 'trades.pair_id', 'pairs.id')
+      .where('trades.user_id', cognito.user.id)
+      .where('trades.id', params.id)
+      .select('trades.*', 'pairs.symbol as symbol')
       .first()
 
     if (!trade) return response.notFound({ message: 'Trade not found' })

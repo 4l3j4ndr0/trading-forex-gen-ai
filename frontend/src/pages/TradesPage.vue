@@ -65,7 +65,7 @@ const pagination = ref({ page: 1, rowsPerPage: 20, rowsNumber: 0 })
 
 const columns = [
   { name: 'opened_at', label: 'Fecha', field: 'opened_at', align: 'left' as const, format: (v: string) => new Date(v).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) },
-  { name: 'symbol', label: 'Par', field: (row: Record<string, unknown>) => row.pair_id, align: 'left' as const },
+  { name: 'symbol', label: 'Par', field: 'symbol', align: 'left' as const },
   { name: 'side', label: 'Side', field: 'side', align: 'center' as const },
   { name: 'lot_size', label: 'Lots', field: 'lot_size', align: 'center' as const },
   { name: 'entry_price', label: 'Entry', field: 'entry_price', align: 'right' as const },
