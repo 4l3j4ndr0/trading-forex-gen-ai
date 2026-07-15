@@ -1,1 +1,236 @@
-/* app global css */
+/* ═══════════════════════════════════════════════════════════════
+   FX AutoTrader — Premium Fintech Dark Theme
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Custom Properties ─────────────────────────────────────── */
+:root {
+  --bg-base: #0B0E14;
+  --bg-card: #151A22;
+  --bg-elevated: #1C2230;
+  --border-color: #222834;
+  --border-hover: #2D3545;
+  --text-muted: #8B949E;
+  --text-secondary: #A0AEC0;
+  --brand-primary: #2962FF;
+  --brand-primary-soft: rgba(41, 98, 255, 0.12);
+  --positive: #21BA45;
+  --negative: #F44336;
+  --warning: #FFA726;
+}
+
+/* ─── Base ──────────────────────────────────────────────────── */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Quasar Dark Overrides ─────────────────────────────────── */
+.body--dark {
+  background-color: var(--bg-base) !important;
+}
+
+.body--dark .q-drawer {
+  background-color: var(--bg-base) !important;
+  border-right: 1px solid var(--border-color) !important;
+}
+
+.body--dark .q-header {
+  background-color: var(--bg-base) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.body--dark .q-page-container {
+  background-color: var(--bg-base) !important;
+}
+
+/* ─── Premium Card ──────────────────────────────────────────── */
+.premium-card {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.premium-card:hover {
+  border-color: var(--border-hover) !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* ─── Typography ────────────────────────────────────────────── */
+.label-mini {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.number-display {
+  font-family: 'Inter', monospace;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+/* ─── Pulse Animation (Status Active) ──────────────────────── */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--positive);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 2s infinite;
+}
+
+.pulse-dot--warning {
+  background-color: var(--warning);
+  animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(33, 186, 69, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(33, 186, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(33, 186, 69, 0); }
+}
+
+@keyframes pulse-warning {
+  0% { box-shadow: 0 0 0 0 rgba(255, 167, 38, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(255, 167, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 167, 38, 0); }
+}
+
+/* ─── Tables ────────────────────────────────────────────────── */
+.body--dark .q-table th {
+  color: var(--text-muted) !important;
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.body--dark .q-table td {
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.body--dark .q-table__container {
+  border-radius: 12px;
+}
+
+.body--dark .q-table--dark {
+  background-color: var(--bg-card) !important;
+}
+
+/* ─── Navigation Items ──────────────────────────────────────── */
+.nav-item {
+  border-radius: 8px !important;
+  margin-bottom: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.nav-item.q-router-link--active,
+.nav-item--active {
+  background-color: var(--brand-primary) !important;
+  color: white !important;
+}
+
+.nav-item:not(.q-router-link--active):hover {
+  background-color: var(--bg-elevated) !important;
+}
+
+/* ─── Progress Bars ─────────────────────────────────────────── */
+.body--dark .q-linear-progress__track {
+  background-color: #1E2736 !important;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2D3545;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3D4555;
+}
+
+/* ─── Banner ────────────────────────────────────────────────── */
+.banner-demo {
+  background: linear-gradient(135deg, rgba(255, 167, 38, 0.08), rgba(255, 167, 38, 0.03)) !important;
+  border: 1px solid rgba(255, 167, 38, 0.2) !important;
+  border-radius: 12px !important;
+}
+
+.banner-live {
+  background: linear-gradient(135deg, rgba(33, 186, 69, 0.08), rgba(33, 186, 69, 0.03)) !important;
+  border: 1px solid rgba(33, 186, 69, 0.2) !important;
+  border-radius: 12px !important;
+}
+
+/* ─── KPI Cards Accent ──────────────────────────────────────── */
+.kpi-accent-top {
+  position: relative;
+}
+
+.kpi-accent-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+}
+
+.kpi-accent-top--primary::before {
+  background: var(--brand-primary);
+}
+
+.kpi-accent-top--positive::before {
+  background: var(--positive);
+}
+
+.kpi-accent-top--warning::before {
+  background: var(--warning);
+}
+
+/* ─── Chip Overrides ────────────────────────────────────────── */
+.chip-side-buy {
+  background-color: rgba(33, 186, 69, 0.15) !important;
+  color: #4ADE80 !important;
+  font-weight: 700;
+}
+
+.chip-side-sell {
+  background-color: rgba(244, 67, 54, 0.15) !important;
+  color: #F87171 !important;
+  font-weight: 700;
+}
+
+/* ─── Timeline (Logs) ───────────────────────────────────────── */
+.body--dark .q-timeline__subtitle {
+  color: var(--text-muted) !important;
+}
+
+/* ─── Utility ───────────────────────────────────────────────── */
+.border-bottom {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.h-full {
+  height: 100%;
+}

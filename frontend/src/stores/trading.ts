@@ -64,21 +64,27 @@ export const useTradingStore = defineStore('trading', {
     async loadDashboard() {
       this.loading = true
       try {
-        const [status, today, open] = await Promise.all([
+        const [status, today, open] = await Promise.allSettled([
           api.get<{ data: { killSwitch: boolean; autoTradingEnabled: boolean; openPositions: number; dailyPnl: number; balance: number; equity: number; accountType: string } }>('/system/status'),
           api.get<{ data: DailySummary }>('/daily/today'),
           api.get<{ data: Trade[] }>('/trades/open'),
         ])
 
-        this.killSwitch = status.data.killSwitch
-        this.autoTrading = status.data.autoTradingEnabled
-        this.openPositions = status.data.openPositions
-        this.dailyPnl = status.data.dailyPnl
-        this.balance = status.data.balance
-        this.equity = status.data.equity
-        this.accountType = status.data.accountType
-        this.dailySummary = today.data
-        this.openTrades = open.data
+        if (status.status === 'fulfilled') {
+          this.killSwitch = status.value.data.killSwitch
+          this.autoTrading = status.value.data.autoTradingEnabled
+          this.openPositions = status.value.data.openPositions
+          this.dailyPnl = status.value.data.dailyPnl
+          this.balance = status.value.data.balance
+          this.equity = status.value.data.equity
+          this.accountType = status.value.data.accountType
+        }
+        if (today.status === 'fulfilled') {
+          this.dailySummary = today.value.data
+        }
+        if (open.status === 'fulfilled') {
+          this.openTrades = open.value.data
+        }
       } catch (e) {
         console.error('Failed to load dashboard', e)
       } finally {

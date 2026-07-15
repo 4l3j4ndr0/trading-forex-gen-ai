@@ -55,7 +55,8 @@ export const useAuthStore = defineStore('auth', {
           this.email = signInDetails?.loginId || (typeof payload['email'] === 'string' ? payload['email'] : '')
           this.fullName = typeof payload['name'] === 'string' ? payload['name'] : ''
 
-          await this.loadProfile()
+          // Load profile in background — don't block navigation
+          this.loadProfile().catch(() => {})
         }
       } catch {
         this.reset()

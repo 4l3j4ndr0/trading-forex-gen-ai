@@ -265,6 +265,28 @@ class MT5Client:
         return {"symbol": symbol, "timeframe": timeframe, "period": period,
                 "atr": round(atr, 6), "atr_pips": round(atr / pip_size, 1), "last_candle": candles[-1]}
 
+    def get_deal_history(self, ticket: int, suffix: str = "") -> dict:
+        """Get deal history for a closed position by its ticket."""
+        from datetime import datetime, timedelta
+        # Search last 30 days of history
+        date_from = datetime.now() - timedelta(days=30)
+        date_to = datetime.now() + timedelta(days=1)
+        deals = mt5.history_deals_get(date_from, date_to, position=ticket)
+        if deals is None or len(deals) == 0:
+            return {"error": f"No deal history found for ticket {ticket}"}
+        # Last deal is the closing one
+        close_deal = deals[-1]
+        return {
+            "ticket": ticket,
+            "price": close_deal.price,
+            "profit": close_deal.profit,
+            "commission": close_deal.commission,
+            "swap": close_deal.swap,
+            "volume": close_deal.volume,
+            "type": close_deal.type,
+            "time": int(close_deal.time),
+        }
+
     def get_spread(self, symbol: str, suffix: str = "") -> dict:
         mt5_sym = symbol + suffix
         info = mt5.symbol_info(mt5_sym)

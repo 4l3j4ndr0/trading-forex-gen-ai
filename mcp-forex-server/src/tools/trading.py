@@ -314,9 +314,12 @@ def register_trading_tools(mcp):
     def get_open_positions() -> str:
         """
         Get all open positions with live PnL from MT5.
+        Automatically reconciles: if a trade exists in DB as 'open' but not in MT5,
+        it was closed by SL/TP and gets updated in DB.
 
         Returns:
             List of positions with entry, current price, PnL, and age.
+            Also reports any auto-closed trades found during reconciliation.
         """
         positions = bridge.get_positions()
         if isinstance(positions, dict) and "error" in positions:
@@ -325,6 +328,61 @@ def register_trading_tools(mcp):
         s = _get_settings()
         max_duration = int(s.get("max_trade_duration_minutes", 240))
 
+        # --- Reconciliation: detect trades closed by SL/TP in MT5 ---
+        mt5_tickets = {pos["ticket"] for pos in positions}
+        db_open_trades = execute(
+            "SELECT id, ticket, side, entry_price, sl_pips, pair_id FROM trades WHERE user_id = %s AND status = 'open'",
+            (USER_ID,)
+        )
+
+        reconciled = []
+        for trade in (db_open_trades or []):
+            if trade["ticket"] not in mt5_tickets:
+                # Trade was closed by broker (SL/TP hit) — get history from bridge
+                history = bridge.get_deal_history(trade["ticket"])
+                if history and "error" not in history:
+                    exit_price = history.get("price", 0)
+                    pnl_usd = history.get("profit", 0)
+                    pair = execute_one("SELECT symbol FROM pairs WHERE id = %s", (trade["pair_id"],))
+                    symbol = pair["symbol"] if pair else ""
+                    pip_size = 0.01 if "JPY" in symbol else 0.0001
+
+                    entry_price = float(trade["entry_price"])
+                    if trade["side"] == "BUY":
+                        pnl_pips = (exit_price - entry_price) / pip_size
+                    else:
+                        pnl_pips = (entry_price - exit_price) / pip_size
+
+                    # Determine close reason
+                    sl_pips = float(trade["sl_pips"]) if trade["sl_pips"] else 0
+                    if sl_pips > 0 and pnl_pips <= -(sl_pips * 0.8):
+                        close_reason = "sl_hit"
+                    elif pnl_pips > 0:
+                        close_reason = "tp_hit"
+                    else:
+                        close_reason = "sl_hit"
+
+                    rr_achieved = pnl_pips / sl_pips if sl_pips > 0 else 0
+
+                    execute(
+                        """UPDATE trades SET exit_price = %s, pnl_pips = %s, pnl_usd = %s, rr_achieved = %s,
+                            close_reason = %s, status = 'closed', closed_at = NOW(), updated_at = NOW()
+                        WHERE id = %s""",
+                        (exit_price, round(pnl_pips, 1), round(pnl_usd, 2), round(rr_achieved, 2),
+                         close_reason, trade["id"])
+                    )
+                    reconciled.append({"ticket": trade["ticket"], "pnl_usd": round(pnl_usd, 2), "reason": close_reason})
+                else:
+                    # Can't get history — mark as closed with unknown
+                    execute(
+                        """UPDATE trades SET close_reason = 'broker_closed', status = 'closed',
+                            closed_at = NOW(), updated_at = NOW()
+                        WHERE id = %s""",
+                        (trade["id"],)
+                    )
+                    reconciled.append({"ticket": trade["ticket"], "pnl_usd": 0, "reason": "broker_closed"})
+
+        # --- Build enriched positions list ---
         enriched = []
         for pos in positions:
             trade = execute_one(
@@ -351,7 +409,12 @@ def register_trading_tools(mcp):
                 "comment": trade["comment"] if trade else pos.get("comment", ""),
             })
 
-        return json.dumps({"count": len(enriched), "positions": enriched})
+        result = {"count": len(enriched), "positions": enriched}
+        if reconciled:
+            result["reconciled"] = reconciled
+            result["reconciled_count"] = len(reconciled)
+
+        return json.dumps(result)
 
     @mcp.tool()
     def get_account_info() -> str:

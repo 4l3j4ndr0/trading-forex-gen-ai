@@ -83,6 +83,10 @@ class MT5BridgeClient:
             data["tp"] = tp
         return _post("/order/modify", data)
 
+    def get_deal_history(self, ticket: int) -> dict:
+        """Get closed deal info by position ticket (for SL/TP reconciliation)."""
+        return _get(f"/history/deal/{ticket}")
+
 
 # Singleton
 bridge = MT5BridgeClient()

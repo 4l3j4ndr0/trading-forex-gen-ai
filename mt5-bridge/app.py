@@ -212,6 +212,17 @@ def order_modify():
     return jsonify(result)
 
 
+# ─── Deal History (for reconciliation) ────────────────────
+
+@app.route("/history/deal/<int:ticket>", methods=["GET"])
+@require_auth
+def deal_history(ticket):
+    result = mt5_client.get_deal_history(ticket, suffix=_suffix())
+    if "error" in result:
+        return jsonify(result), 404
+    return jsonify(result)
+
+
 # ─── Run ──────────────────────────────────────────────────
 
 if __name__ == "__main__":

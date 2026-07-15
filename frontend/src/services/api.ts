@@ -12,6 +12,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    signal: AbortSignal.timeout(10000),
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
