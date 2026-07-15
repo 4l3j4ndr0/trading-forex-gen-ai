@@ -30,7 +30,7 @@
       <q-timeline-entry
         v-for="log in store.hourlyLogs"
         :key="log.id"
-        :subtitle="`${String(log.utc_hour).padStart(2, '0')}:00 UTC — ${sessionLabel(log.session)}`"
+        :subtitle="`${formatTime(log.timestamp)} UTC — ${sessionLabel(log.session)}`"
         :icon="logIcon(log)"
         :color="logColor(log)"
       >
@@ -89,6 +89,11 @@ import { useTradingStore } from '@/stores/trading'
 
 const store = useTradingStore()
 const dateFilter = ref(new Date().toISOString().split('T')[0])
+
+function formatTime(timestamp: string) {
+  const d = new Date(timestamp)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
 
 function sessionLabel(session: string | null) {
   if (!session) return 'off-hours'
