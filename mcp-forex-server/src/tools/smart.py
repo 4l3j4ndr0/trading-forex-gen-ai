@@ -298,13 +298,37 @@ def register_smart_tools(mcp):
 
         can_trade = len(blocked_reasons) == 0
 
-        return json.dumps({
+        result = {
             "can_trade": can_trade,
             "checks": checks,
             "active_sessions": sessions,
             "warnings": warnings,
             "blocked_reasons": blocked_reasons,
-        })
+        }
+
+        # Include recent agent decisions for context (only if can trade)
+        if can_trade:
+            recent_logs = execute(
+                """SELECT created_at, utc_hour, decision_summary, trades_opened, trades_closed, trades_skipped, pnl_this_hour
+                FROM hourly_logs WHERE user_id = %s
+                ORDER BY created_at DESC LIMIT 3""",
+                (USER_ID,)
+            )
+            if recent_logs:
+                result["recent_decisions"] = [
+                    {
+                        "timestamp": r["created_at"].isoformat() if r["created_at"] else None,
+                        "hour_utc": r["utc_hour"],
+                        "summary": r["decision_summary"],
+                        "opened": r["trades_opened"],
+                        "closed": r["trades_closed"],
+                        "skipped": r["trades_skipped"],
+                        "pnl": float(r["pnl_this_hour"]) if r["pnl_this_hour"] else 0,
+                    }
+                    for r in recent_logs
+                ]
+
+        return json.dumps(result)
 
     @mcp.tool()
     def get_optimal_sl_tp(symbol: str, side: str, strategy: str = "balanced") -> str:
