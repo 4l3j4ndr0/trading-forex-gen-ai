@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTradingStore } from '@/stores/trading'
@@ -92,4 +92,19 @@ async function logout() {
   await authStore.logOut()
   await router.push('/login')
 }
+
+// Cargar data del dashboard cuando el usuario tiene sesión activa
+async function loadGlobalData() {
+  if (authStore.isAuthenticated) {
+    await tradingStore.loadDashboard()
+  }
+}
+
+// Cargar al montar (cualquier página)
+onMounted(() => void loadGlobalData())
+
+// Recargar cuando el perfil se carga (después de login/refresh)
+watch(() => authStore.profileLoaded, (loaded) => {
+  if (loaded) void loadGlobalData()
+})
 </script>
