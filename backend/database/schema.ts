@@ -142,8 +142,10 @@ export class PairSchema extends BaseModel {
 }
 
 export class TradeSchema extends BaseModel {
-  static $columns = ['closeReason', 'closedAt', 'comment', 'commission', 'createdAt', 'entryPrice', 'exitPrice', 'holdingMinutes', 'hourlyLogId', 'id', 'lotSize', 'openedAt', 'pairId', 'pnlPips', 'pnlUsd', 'riskUsd', 'rrAchieved', 'rrRatio', 'side', 'slPips', 'slPrice', 'status', 'swap', 'ticket', 'tpPips', 'tpPrice', 'updatedAt', 'userId'] as const
+  static $columns = ['basketId', 'closeReason', 'closedAt', 'comment', 'commission', 'createdAt', 'entryPrice', 'exitPrice', 'holdingMinutes', 'hourlyLogId', 'id', 'lotSize', 'openedAt', 'pairId', 'pnlPips', 'pnlUsd', 'riskUsd', 'rrAchieved', 'rrRatio', 'side', 'slPips', 'slPrice', 'status', 'swap', 'ticket', 'tpPips', 'tpPrice', 'updatedAt', 'userId'] as const
   $columns = TradeSchema.$columns
+  @column()
+  declare basketId: string | null
   @column()
   declare closeReason: string | null
   @column.dateTime()

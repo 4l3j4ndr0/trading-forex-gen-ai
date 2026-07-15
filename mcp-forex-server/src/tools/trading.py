@@ -388,3 +388,112 @@ def register_trading_tools(mcp):
             Spread in pips, pip value, min/max lot, bid/ask.
         """
         return json.dumps(bridge.get_symbol_info(symbol))
+
+    @mcp.tool()
+    def get_basket_status(symbol: str = None) -> str:
+        """
+        Get basket (grouped by symbol) status for all open positions.
+        Shows net PnL per basket, individual legs, and whether hedge is active.
+
+        Args:
+            symbol: Optional — filter by specific pair. If None, returns all active baskets.
+
+        Returns:
+            List of baskets with net PnL, individual positions, hedge status, and recommendation.
+        """
+        positions = bridge.get_positions()
+        if isinstance(positions, dict) and "error" in positions:
+            return json.dumps(positions)
+
+        if not positions or (isinstance(positions, list) and len(positions) == 1 and isinstance(positions[0], dict) and not positions[0]):
+            return json.dumps({"baskets": [], "total_floating_pnl": 0, "message": "No open positions"})
+
+        # Filter valid positions
+        valid_positions = [p for p in positions if isinstance(p, dict) and p.get("symbol")]
+
+        if symbol:
+            valid_positions = [p for p in valid_positions if p.get("symbol", "").replace("#", "").replace(".", "") == symbol or p.get("symbol") == symbol]
+
+        # Group by symbol (basket)
+        baskets_map: dict = {}
+        for pos in valid_positions:
+            sym = pos.get("symbol", "UNKNOWN").replace("#", "")
+            if sym not in baskets_map:
+                baskets_map[sym] = {"buy_legs": [], "sell_legs": [], "total_buy_lots": 0, "total_sell_lots": 0}
+
+            leg = {
+                "ticket": pos.get("ticket"),
+                "side": "BUY" if pos.get("type") == 0 else "SELL",
+                "lots": pos.get("volume", 0),
+                "open_price": pos.get("price_open", 0),
+                "current_price": pos.get("price_current", 0),
+                "pnl": pos.get("profit", 0),
+                "swap": pos.get("swap", 0),
+                "comment": pos.get("comment", ""),
+            }
+
+            if leg["side"] == "BUY":
+                baskets_map[sym]["buy_legs"].append(leg)
+                baskets_map[sym]["total_buy_lots"] += leg["lots"]
+            else:
+                baskets_map[sym]["sell_legs"].append(leg)
+                baskets_map[sym]["total_sell_lots"] += leg["lots"]
+
+        # Build basket summaries
+        baskets = []
+        total_floating = 0
+
+        for sym, data in baskets_map.items():
+            all_legs = data["buy_legs"] + data["sell_legs"]
+            net_pnl = sum(leg["pnl"] + leg["swap"] for leg in all_legs)
+            total_floating += net_pnl
+
+            is_hedged = bool(data["buy_legs"] and data["sell_legs"])
+            net_lots = round(data["total_buy_lots"] - data["total_sell_lots"], 2)
+
+            # Determine basket state
+            if is_hedged:
+                if abs(net_lots) < 0.01:
+                    state = "FULLY_HEDGED"
+                else:
+                    state = "PARTIALLY_HEDGED"
+            else:
+                state = "UNHEDGED"
+
+            # Recommendation
+            if net_pnl > 0:
+                recommendation = "CLOSE_BASKET_PROFIT"
+            elif is_hedged and net_pnl < 0:
+                recommendation = "MONITOR_FOR_UNLOCK"
+            elif not is_hedged and net_pnl < -10:
+                recommendation = "CONSIDER_HEDGE"
+            else:
+                recommendation = "HOLD"
+
+            basket = {
+                "symbol": sym,
+                "state": state,
+                "net_pnl": round(net_pnl, 2),
+                "net_lots": net_lots,
+                "direction": "LONG" if net_lots > 0 else "SHORT" if net_lots < 0 else "NEUTRAL",
+                "buy_legs": data["buy_legs"],
+                "sell_legs": data["sell_legs"],
+                "total_positions": len(all_legs),
+                "is_hedged": is_hedged,
+                "recommendation": recommendation,
+            }
+            baskets.append(basket)
+
+        # Get basket_ids from DB for context
+        db_baskets = execute(
+            "SELECT DISTINCT basket_id, pair_id FROM trades WHERE user_id = %s AND status = 'open' AND basket_id IS NOT NULL",
+            (USER_ID,)
+        )
+
+        return json.dumps({
+            "baskets": baskets,
+            "total_baskets": len(baskets),
+            "total_floating_pnl": round(total_floating, 2),
+            "hedged_baskets": sum(1 for b in baskets if b["is_hedged"]),
+            "db_basket_ids": [r["basket_id"] for r in db_baskets] if db_baskets else [],
+        })

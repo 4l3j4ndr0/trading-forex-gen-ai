@@ -31,6 +31,7 @@ def register_database_tools(mcp):
         tp_pips: float,
         risk_usd: float,
         comment: str = "",
+        basket_id: str = None,
     ) -> str:
         """
         Register a new trade in the database.
@@ -47,6 +48,7 @@ def register_database_tools(mcp):
             tp_pips: Take profit in pips
             risk_usd: Risk amount in USD
             comment: AI reasoning for the trade
+            basket_id: Optional basket identifier to group hedged positions (e.g. 'EURUSD-20260714-001')
 
         Returns:
             Trade ID confirmation.
@@ -59,14 +61,14 @@ def register_database_tools(mcp):
 
         row = execute_insert(
             """INSERT INTO trades (user_id, pair_id, ticket, side, lot_size, entry_price, sl_price, tp_price,
-                sl_pips, tp_pips, risk_usd, rr_ratio, comment, status, opened_at, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'open', NOW(), NOW())
+                sl_pips, tp_pips, risk_usd, rr_ratio, comment, basket_id, status, opened_at, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'open', NOW(), NOW())
             RETURNING id""",
             (USER_ID, pair_id, ticket, side.upper(), lot_size, entry_price, sl_price, tp_price,
-             sl_pips, tp_pips, risk_usd, rr_ratio, comment)
+             sl_pips, tp_pips, risk_usd, rr_ratio, comment, basket_id)
         )
 
-        return json.dumps({"trade_id": str(row["id"]), "registered": True})
+        return json.dumps({"trade_id": str(row["id"]), "basket_id": basket_id, "registered": True})
 
     @mcp.tool()
     def update_trade(
