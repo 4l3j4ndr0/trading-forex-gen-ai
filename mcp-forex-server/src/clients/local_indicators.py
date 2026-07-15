@@ -138,6 +138,123 @@ def _calculate_atr(candles: list[dict], period: int = 14) -> float:
     return atr
 
 
+def _detect_divergences(candles: list[dict], lookback: int = 30) -> list[dict]:
+    """
+    Detect RSI divergences by comparing swing highs/lows in price vs RSI.
+
+    - Bullish regular: price Lower Low, RSI Higher Low (reversal up)
+    - Bearish regular: price Higher High, RSI Lower High (reversal down)
+    - Hidden bullish: price Higher Low, RSI Lower Low (continuation up)
+    - Hidden bearish: price Lower High, RSI Higher High (continuation down)
+    """
+    if len(candles) < lookback + 15:
+        return []
+
+    closes = [c["close"] for c in candles]
+    period = 14
+
+    # Build RSI series
+    rsi_series = []
+    for i in range(period + 1, len(closes) + 1):
+        segment = closes[:i]
+        deltas = [segment[j] - segment[j - 1] for j in range(1, len(segment))]
+        gains = [d if d > 0 else 0 for d in deltas]
+        losses = [-d if d < 0 else 0 for d in deltas]
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+        for k in range(period, len(deltas)):
+            avg_gain = (avg_gain * (period - 1) + gains[k]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[k]) / period
+        if avg_loss == 0:
+            rsi_series.append(100.0)
+        else:
+            rsi_series.append(100 - (100 / (1 + avg_gain / avg_loss)))
+
+    if len(rsi_series) < lookback:
+        return []
+
+    # Work with last N candles
+    price_window = closes[-lookback:]
+    rsi_window = rsi_series[-lookback:]
+
+    # Find swing highs and lows (higher/lower than 2 neighbors on each side)
+    swing_highs = []
+    swing_lows = []
+    for i in range(2, len(price_window) - 2):
+        if price_window[i] > price_window[i-1] and price_window[i] > price_window[i-2] and \
+           price_window[i] > price_window[i+1] and price_window[i] > price_window[i+2]:
+            swing_highs.append(i)
+        if price_window[i] < price_window[i-1] and price_window[i] < price_window[i-2] and \
+           price_window[i] < price_window[i+1] and price_window[i] < price_window[i+2]:
+            swing_lows.append(i)
+
+    divergences = []
+
+    # Bullish divergences (from swing lows)
+    if len(swing_lows) >= 2:
+        prev_idx = swing_lows[-2]
+        curr_idx = swing_lows[-1]
+
+        # Regular: price LL, RSI HL
+        if price_window[curr_idx] < price_window[prev_idx] and \
+           rsi_window[curr_idx] > rsi_window[prev_idx]:
+            divergences.append({
+                "type": "bullish_regular",
+                "signal": "BUY",
+                "description": "Price Lower Low + RSI Higher Low → reversal UP",
+                "price_levels": [round(price_window[prev_idx], 5), round(price_window[curr_idx], 5)],
+                "rsi_levels": [round(rsi_window[prev_idx], 1), round(rsi_window[curr_idx], 1)],
+                "candles_ago": lookback - curr_idx,
+                "strength": "strong" if rsi_window[curr_idx] < 35 else "moderate",
+            })
+
+        # Hidden: price HL, RSI LL
+        if price_window[curr_idx] > price_window[prev_idx] and \
+           rsi_window[curr_idx] < rsi_window[prev_idx]:
+            divergences.append({
+                "type": "bullish_hidden",
+                "signal": "BUY",
+                "description": "Price Higher Low + RSI Lower Low → continuation UP",
+                "price_levels": [round(price_window[prev_idx], 5), round(price_window[curr_idx], 5)],
+                "rsi_levels": [round(rsi_window[prev_idx], 1), round(rsi_window[curr_idx], 1)],
+                "candles_ago": lookback - curr_idx,
+                "strength": "moderate",
+            })
+
+    # Bearish divergences (from swing highs)
+    if len(swing_highs) >= 2:
+        prev_idx = swing_highs[-2]
+        curr_idx = swing_highs[-1]
+
+        # Regular: price HH, RSI LH
+        if price_window[curr_idx] > price_window[prev_idx] and \
+           rsi_window[curr_idx] < rsi_window[prev_idx]:
+            divergences.append({
+                "type": "bearish_regular",
+                "signal": "SELL",
+                "description": "Price Higher High + RSI Lower High → reversal DOWN",
+                "price_levels": [round(price_window[prev_idx], 5), round(price_window[curr_idx], 5)],
+                "rsi_levels": [round(rsi_window[prev_idx], 1), round(rsi_window[curr_idx], 1)],
+                "candles_ago": lookback - curr_idx,
+                "strength": "strong" if rsi_window[curr_idx] > 65 else "moderate",
+            })
+
+        # Hidden: price LH, RSI HH
+        if price_window[curr_idx] < price_window[prev_idx] and \
+           rsi_window[curr_idx] > rsi_window[prev_idx]:
+            divergences.append({
+                "type": "bearish_hidden",
+                "signal": "SELL",
+                "description": "Price Lower High + RSI Higher High → continuation DOWN",
+                "price_levels": [round(price_window[prev_idx], 5), round(price_window[curr_idx], 5)],
+                "rsi_levels": [round(rsi_window[prev_idx], 1), round(rsi_window[curr_idx], 1)],
+                "candles_ago": lookback - curr_idx,
+                "strength": "moderate",
+            })
+
+    return divergences
+
+
 def _calculate_stochastic(candles: list[dict], k_period: int = 14, d_period: int = 3) -> dict:
     if len(candles) < k_period:
         return {"k": 50, "d": 50}
@@ -269,10 +386,13 @@ def get_full_analysis(symbol: str, timeframe: str = "H1", count: int = 200) -> d
     # Recommendation
     rec, strength = _generate_recommendation(rsi, macd, adx_data, ema_trend, stoch)
 
+    # Divergences
+    divergences = _detect_divergences(candles, 30)
+
     pip_size = 0.01 if "JPY" in symbol else 0.0001
     current = candles[-1]
 
-    return {
+    result = {
         "symbol": symbol,
         "timeframe": timeframe,
         "price": {
@@ -298,7 +418,10 @@ def get_full_analysis(symbol: str, timeframe: str = "H1", count: int = 200) -> d
             "stoch_k": stoch["k"],
             "stoch_d": stoch["d"],
         },
+        "divergences": divergences,
         "recommendation": rec,
         "strength": strength,
         "ema_trend": ema_trend,
     }
+
+    return result
