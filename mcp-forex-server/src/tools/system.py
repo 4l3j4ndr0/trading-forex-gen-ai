@@ -95,17 +95,17 @@ def register_system_tools(mcp):
             components["database"] = {"status": "error", "error": str(e)}
             warnings.append("Database connection failed")
 
-        # TradingView
+        # Local indicators (broker candles)
         try:
-            from src.clients.tradingview import get_analysis
-            result = get_analysis("EURUSD", "1d")
+            from src.clients.local_indicators import get_full_analysis
+            result = get_full_analysis("EURUSD", "H1", 50)
             if "error" in result:
-                components["tradingview"] = {"status": "degraded", "note": "rate limited"}
+                components["indicators"] = {"status": "degraded", "note": result["error"]}
             else:
-                components["tradingview"] = {"status": "ok", "last_price": result["price"]["close"]}
+                components["indicators"] = {"status": "ok", "last_price": result["price"]["close"]}
         except Exception:
-            components["tradingview"] = {"status": "error"}
-            warnings.append("TradingView unavailable")
+            components["indicators"] = {"status": "error"}
+            warnings.append("Local indicators unavailable")
 
         # MT5 Bridge
         try:

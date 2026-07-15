@@ -1,28 +1,29 @@
-"""Analysis tools — TradingView TA for Forex."""
+"""Analysis tools — using local indicators from broker candles (no TradingView dependency)."""
 
 import json
 from datetime import datetime, timezone
 
-from src.clients.tradingview import get_analysis
+from src.clients.local_indicators import get_full_analysis
 
 
 def register_analysis_tools(mcp):
     """Register all analysis tools."""
 
     @mcp.tool()
-    def forex_analysis(symbol: str, timeframe: str = "1h") -> str:
+    def forex_analysis(symbol: str, timeframe: str = "H1") -> str:
         """
         Full technical analysis of a forex pair on a specific timeframe.
+        Uses real candles from MT5 broker — no external API dependency.
 
         Args:
             symbol: Forex pair — EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, EURGBP
-            timeframe: '5m', '15m', '1h', '4h', '1d', '1w'
+            timeframe: M5, M15, H1, H4, D1
 
         Returns:
-            Price, indicators (RSI, MACD, ADX, ATR, EMAs, Bollinger),
+            Price, indicators (RSI, MACD, ADX, ATR, EMAs, Stochastic),
             recommendation (BUY/SELL/NEUTRAL), and signal strength.
         """
-        result = get_analysis(symbol, timeframe)
+        result = get_full_analysis(symbol, timeframe, 200)
         if "error" in result:
             return json.dumps(result)
 
@@ -34,6 +35,7 @@ def register_analysis_tools(mcp):
         """
         Top-down multi-timeframe analysis: D1 → H4 → H1.
         Determines trend alignment and gives a score from -3 to +3.
+        Uses real candles from MT5 broker — no external API dependency.
 
         Args:
             symbol: Forex pair — EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, EURGBP
@@ -41,12 +43,12 @@ def register_analysis_tools(mcp):
         Returns:
             Analysis for each timeframe, alignment score, and trading recommendation.
         """
-        timeframes = {"D1": "1d", "H4": "4h", "H1": "1h"}
+        timeframes = {"D1": "D1", "H4": "H4", "H1": "H1"}
         results = {}
         score = 0
 
         for tf_name, tf_code in timeframes.items():
-            analysis = get_analysis(symbol, tf_code)
+            analysis = get_full_analysis(symbol, tf_code, 200)
             if "error" in analysis:
                 results[tf_name] = {"error": analysis["error"]}
                 continue
@@ -66,6 +68,8 @@ def register_analysis_tools(mcp):
                 "ema_trend": analysis["ema_trend"],
                 "adx": analysis["indicators"]["adx_14"],
                 "rsi": analysis["indicators"]["rsi_14"],
+                "atr_pips": analysis["indicators"]["atr_pips"],
+                "stoch_k": analysis["indicators"]["stoch_k"],
                 "score_contribution": tf_score,
             }
 
@@ -94,9 +98,10 @@ def register_analysis_tools(mcp):
     def forex_market_scan(pairs: str = None, min_adx: float = 25.0) -> str:
         """
         Scan multiple forex pairs and rank trading opportunities.
+        Uses real candles from MT5 broker — no external API dependency.
 
         Args:
-            pairs: Comma-separated pairs to scan. Default: all allowed pairs.
+            pairs: Comma-separated pairs to scan. Default: all major pairs.
             min_adx: Minimum ADX threshold for trend strength (default 25).
 
         Returns:
@@ -111,26 +116,30 @@ def register_analysis_tools(mcp):
         for pair in scan_pairs:
             pair = pair.strip().upper()
 
-            # Quick H1 analysis for filtering
-            h1 = get_analysis(pair, "1h")
-            if "error" in h1:
-                no_trade.append({"symbol": pair, "reason": h1["error"]})
+            # Multi-timeframe analysis
+            score = 0
+            h1_data = None
+
+            for tf_code in ["D1", "H4", "H1"]:
+                a = get_full_analysis(pair, tf_code, 200)
+                if "error" in a:
+                    continue
+
+                rec = a["recommendation"]
+                if rec in ("BUY", "STRONG_BUY"):
+                    score += 1
+                elif rec in ("SELL", "STRONG_SELL"):
+                    score -= 1
+
+                if tf_code == "H1":
+                    h1_data = a
+
+            if not h1_data:
+                no_trade.append({"symbol": pair, "reason": "Failed to get H1 data"})
                 continue
 
-            adx = h1["indicators"]["adx_14"]
-            rsi = h1["indicators"]["rsi_14"]
-
-            # Multi-timeframe for alignment
-            tf_data = {}
-            score = 0
-            for tf_name, tf_code in [("D1", "1d"), ("H4", "4h"), ("H1", "1h")]:
-                a = get_analysis(pair, tf_code)
-                if "error" not in a:
-                    rec = a["recommendation"]
-                    if rec in ("BUY", "STRONG_BUY"):
-                        score += 1
-                    elif rec in ("SELL", "STRONG_SELL"):
-                        score -= 1
+            adx = h1_data["indicators"]["adx_14"]
+            rsi = h1_data["indicators"]["rsi_14"]
 
             # Filter
             if adx < min_adx or abs(score) < 2:
@@ -143,9 +152,11 @@ def register_analysis_tools(mcp):
             opportunities.append({
                 "symbol": pair,
                 "recommendation": "BUY" if score > 0 else "SELL",
-                "strength": h1["strength"],
+                "strength": h1_data["strength"],
                 "adx": adx,
                 "rsi": rsi,
+                "ema_trend": h1_data["ema_trend"],
+                "atr_pips": h1_data["indicators"]["atr_pips"],
                 "alignment_score": score,
             })
 

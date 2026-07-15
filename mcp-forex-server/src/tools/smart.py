@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 
 from src.core.db import execute, execute_one
-from src.clients.tradingview import get_analysis
+from src.clients.local_indicators import get_full_analysis
 
 USER_ID = os.getenv("USER_ID", "")
 
@@ -41,8 +41,8 @@ def register_smart_tools(mcp):
         max_lot = float(s.get("max_lot_size", 0.50))
 
         # Get current price to calculate pip value dynamically
-        from src.clients.tradingview import get_analysis
-        analysis = get_analysis(symbol, "1h")
+        from src.clients.local_indicators import get_full_analysis
+        analysis = get_full_analysis(symbol, "H1")
         if "error" in analysis:
             return json.dumps({"error": f"Cannot get price for {symbol}: {analysis['error']}"})
 
@@ -310,7 +310,7 @@ def register_smart_tools(mcp):
     def get_optimal_sl_tp(symbol: str, side: str, strategy: str = "balanced") -> str:
         """
         Calculate dynamic SL and TP based on ATR-equivalent volatility.
-        Uses H1 price range as ATR proxy (TradingView doesn't provide ATR for forex).
+        Uses H1 ATR calculated from broker candles.
 
         Args:
             symbol: Forex pair
@@ -320,13 +320,10 @@ def register_smart_tools(mcp):
         Returns:
             SL/TP in pips and price, with R:R ratio.
         """
-        # Get H1 data for volatility estimate
-        h1 = get_analysis(symbol, "1h")
+        # Get H1 data for volatility
+        h1 = get_full_analysis(symbol, "H1", 200)
         if "error" in h1:
             return json.dumps(h1)
-
-        # Also get H4 for better ATR estimate
-        h4 = get_analysis(symbol, "4h")
 
         close = h1["price"]["close"]
         high = h1["price"]["high"]
@@ -335,17 +332,17 @@ def register_smart_tools(mcp):
         if not close or not high or not low:
             return json.dumps({"error": "Price data unavailable"})
 
-        # ATR proxy: use H1 high-low range (typical bar range)
-        h1_range = high - low
-
-        # For 5-digit pairs (EURUSD, GBPUSD), 1 pip = 0.0001
-        # For JPY pairs, 1 pip = 0.01
+        # Use real ATR from indicators
         if "JPY" in symbol:
             pip_size = 0.01
         else:
             pip_size = 0.0001
 
-        atr_pips = h1_range / pip_size
+        atr_pips = h1["indicators"].get("atr_pips", 0)
+        if not atr_pips or atr_pips == 0:
+            # Fallback to H1 range
+            h1_range = high - low
+            atr_pips = h1_range / pip_size
 
         # Ensure minimum ATR (avoid too-tight stops)
         if atr_pips < 5:
