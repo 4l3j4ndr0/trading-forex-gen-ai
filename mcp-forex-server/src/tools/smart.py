@@ -208,7 +208,17 @@ def register_smart_tools(mcp):
         if kill_switch:
             blocked_reasons.append("Kill switch is ON")
 
-        # 2. Trading hours
+        # 2. Weekend check (Forex market closed Sat-Sun)
+        day_of_week = now.isoweekday()  # 1=Monday, 7=Sunday
+        is_weekend = day_of_week >= 6  # Saturday=6, Sunday=7
+        checks["market_open"] = {
+            "pass": not is_weekend,
+            "detail": "Market open (weekday)" if not is_weekend else f"Market CLOSED (weekend — {'Saturday' if day_of_week == 6 else 'Sunday'})",
+        }
+        if is_weekend:
+            blocked_reasons.append("Forex market closed on weekends")
+
+        # 3. Trading hours
         start_hour = int(str(s.get("trading_start_utc", "07:00")).split(":")[0])
         end_hour = int(str(s.get("trading_end_utc", "21:00")).split(":")[0])
         in_hours = start_hour <= hour < end_hour
@@ -219,7 +229,7 @@ def register_smart_tools(mcp):
         if not in_hours:
             blocked_reasons.append(f"Outside trading hours ({start_hour:02d}:00-{end_hour:02d}:00 UTC)")
 
-        # 3. Sessions
+        # 4. Sessions
         sessions = []
         if 7 <= hour < 16:
             sessions.append("london")
@@ -231,7 +241,7 @@ def register_smart_tools(mcp):
         if in_hours and hour >= end_hour - 1:
             warnings.append("Trading window ends in <1 hour. Consider smaller positions.")
 
-        # 4. Daily loss check
+        # 5. Daily loss check
         from src.clients.mt5_bridge import bridge
         account = bridge.get_account()
         balance = account.get("balance", 10000) if "error" not in account else 10000

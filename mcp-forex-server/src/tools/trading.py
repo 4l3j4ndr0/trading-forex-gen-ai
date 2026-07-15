@@ -32,6 +32,11 @@ def _can_open_position(symbol: str, lot_size: float) -> dict | None:
 
     # Trading hours
     now = datetime.now(timezone.utc)
+
+    # Weekend check
+    if now.isoweekday() >= 6:
+        return {"error": "Forex market closed on weekends"}
+
     start_hour = int(str(s.get("trading_start_utc", "07:00")).split(":")[0])
     end_hour = int(str(s.get("trading_end_utc", "21:00")).split(":")[0])
     if not (start_hour <= now.hour < end_hour):
