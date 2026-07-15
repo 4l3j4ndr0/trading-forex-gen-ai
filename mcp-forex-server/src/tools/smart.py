@@ -302,6 +302,7 @@ def register_smart_tools(mcp):
             "can_trade": can_trade,
             "checks": checks,
             "active_sessions": sessions,
+            "allowed_pairs": json.loads(s["allowed_pairs"]) if isinstance(s.get("allowed_pairs"), str) else s.get("allowed_pairs", []),
             "warnings": warnings,
             "blocked_reasons": blocked_reasons,
         }
