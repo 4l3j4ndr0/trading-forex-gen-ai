@@ -63,6 +63,10 @@ def register_database_tools(mcp):
             """INSERT INTO trades (user_id, pair_id, ticket, side, lot_size, entry_price, sl_price, tp_price,
                 sl_pips, tp_pips, risk_usd, rr_ratio, comment, basket_id, status, opened_at, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'open', NOW(), NOW())
+            ON CONFLICT (ticket) DO UPDATE SET
+                basket_id = COALESCE(EXCLUDED.basket_id, trades.basket_id),
+                comment = COALESCE(EXCLUDED.comment, trades.comment),
+                updated_at = NOW()
             RETURNING id""",
             (USER_ID, pair_id, ticket, side.upper(), lot_size, entry_price, sl_price, tp_price,
              sl_pips, tp_pips, risk_usd, rr_ratio, comment, basket_id)
