@@ -12,9 +12,10 @@ INTERVAL_MAP = {
     "1w": Interval.INTERVAL_1_WEEK,
 }
 
-# Rate limiting — max 1 request per second
+# Rate limiting — max 1 request per 1.5 seconds
 _last_request_time = 0.0
-_MIN_INTERVAL = 1.0  # seconds between requests
+_MIN_INTERVAL = 1.5  # seconds between requests
+_MAX_RETRIES = 2
 
 
 def _rate_limit():
@@ -42,17 +43,25 @@ def get_analysis(symbol: str, timeframe: str = "1h") -> dict:
     if not interval:
         return {"error": f"Invalid timeframe '{timeframe}'. Use: {list(INTERVAL_MAP.keys())}"}
 
-    try:
-        _rate_limit()
-        handler = TA_Handler(
-            symbol=symbol,
-            screener="forex",
-            exchange="FX_IDC",
-            interval=interval,
-        )
-        analysis = handler.get_analysis()
-    except Exception as e:
-        return {"error": f"TradingView error: {str(e)}"}
+    last_error = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            _rate_limit()
+            handler = TA_Handler(
+                symbol=symbol,
+                screener="forex",
+                exchange="FX_IDC",
+                interval=interval,
+            )
+            analysis = handler.get_analysis()
+            break
+        except Exception as e:
+            last_error = str(e)
+            if attempt < _MAX_RETRIES:
+                time.sleep(2 * (attempt + 1))  # backoff: 2s, 4s
+            continue
+    else:
+        return {"error": f"TradingView error after {_MAX_RETRIES + 1} attempts: {last_error}"}
 
     indicators = analysis.indicators
     summary = analysis.summary
