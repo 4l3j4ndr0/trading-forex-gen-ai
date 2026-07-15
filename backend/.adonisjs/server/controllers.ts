@@ -11,4 +11,5 @@ export const controllers = {
   System: () => import('#controllers/system_controller'),
   Trades: () => import('#controllers/trades_controller'),
   TradingSettings: () => import('#controllers/trading_settings_controller'),
+  Pairs: () => import('#controllers/pairs_controller'),
 }

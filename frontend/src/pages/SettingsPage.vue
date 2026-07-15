@@ -145,7 +145,7 @@ const settings = reactive({
   autoTradingEnabled: true,
 })
 
-const availablePairs = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'EURGBP', 'NZDUSD', 'USDCHF']
+const availablePairs = ref<string[]>([])
 
 const savingBroker = ref(false)
 const testingBroker = ref(false)
@@ -241,6 +241,15 @@ async function resetSettings() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadBroker(), loadSettings()])
+  await Promise.all([loadBroker(), loadSettings(), loadPairs()])
 })
+
+async function loadPairs() {
+  try {
+    const res = await api.get<{ data: { symbol: string }[] }>('/pairs')
+    availablePairs.value = res.data.map((p) => p.symbol)
+  } catch {
+    availablePairs.value = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'EURGBP', 'GBPJPY', 'NZDUSD', 'USDCHF']
+  }
+}
 </script>

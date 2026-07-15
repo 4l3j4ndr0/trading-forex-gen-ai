@@ -7,6 +7,7 @@
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 
+const PairsController = () => import('#controllers/pairs_controller')
 const MeController = () => import('#controllers/me_controller')
 const BrokerController = () => import('#controllers/broker_controller')
 const TradingSettingsController = () => import('#controllers/trading_settings_controller')
@@ -26,6 +27,9 @@ router.get('/api/v1/health', () => ({
 
 // ─── Auth (Cognito) ────────────────────────────────────────
 router.get('/api/v1/me', [MeController, 'show']).use(middleware.cognito())
+
+// ─── Pairs ─────────────────────────────────────────────────
+router.get('/api/v1/pairs', [PairsController, 'index']).use(middleware.cognito())
 
 // ─── Broker Config ─────────────────────────────────────────
 router
