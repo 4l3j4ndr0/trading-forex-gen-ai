@@ -68,7 +68,7 @@ def _parse_rss(url: str, timeout: int = 10) -> list[dict]:
                     try:
                         parsed_time = datetime.strptime(pub_date.strip()[:25], "%a, %d %b %Y %H:%M:%S").replace(tzinfo=timezone.utc)
                     except (ValueError, IndexError):
-                        parsed_time = datetime.now(timezone.utc)
+                        parsed_time = None  # Unknown date — will not block trading
 
             # Clean HTML from description
             clean_desc = re.sub(r"<[^>]+>", "", description).strip()
@@ -252,14 +252,16 @@ def register_news_tools(mcp):
         warning = None
         high_impact_items = [n for n in news_items if n["impact"] == "high"]
         if high_impact_items:
-            # If there's recent high impact news (< 30 min), warn
             for item in high_impact_items:
                 if item["time"]:
-                    age_minutes = (datetime.now(timezone.utc) - datetime.fromisoformat(item["time"])).total_seconds() / 60
-                    if age_minutes < 30:
-                        safe_to_trade = False
-                        warning = f"High impact news {item['age']}: {item['title']}"
-                        break
+                    try:
+                        age_minutes = (datetime.now(timezone.utc) - datetime.fromisoformat(item["time"])).total_seconds() / 60
+                        if 0 <= age_minutes < 30:
+                            safe_to_trade = False
+                            warning = f"High impact news {item['age']}: {item['title']}"
+                            break
+                    except (ValueError, TypeError):
+                        continue  # Can't parse time — don't block
 
         return json.dumps({
             "symbol": symbol,
