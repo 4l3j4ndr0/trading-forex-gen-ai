@@ -12,6 +12,12 @@ const routes = {
     tokens: [{"old":"/api/v1/me","type":0,"val":"api","end":""},{"old":"/api/v1/me","type":0,"val":"v1","end":""},{"old":"/api/v1/me","type":0,"val":"me","end":""}],
     types: placeholder as Registry['me.show']['types'],
   },
+  'pairs.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/pairs',
+    tokens: [{"old":"/api/v1/pairs","type":0,"val":"api","end":""},{"old":"/api/v1/pairs","type":0,"val":"v1","end":""},{"old":"/api/v1/pairs","type":0,"val":"pairs","end":""}],
+    types: placeholder as Registry['pairs.index']['types'],
+  },
   'broker.show': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/broker',

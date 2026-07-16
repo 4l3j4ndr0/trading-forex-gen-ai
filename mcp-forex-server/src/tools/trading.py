@@ -493,11 +493,11 @@ def register_trading_tools(mcp):
 
             leg = {
                 "ticket": pos.get("ticket"),
-                "side": "BUY" if pos.get("type") == 0 else "SELL",
-                "lots": pos.get("volume", 0),
-                "open_price": pos.get("price_open", 0),
-                "current_price": pos.get("price_current", 0),
-                "pnl": pos.get("profit", 0),
+                "side": pos.get("side", "BUY"),
+                "lots": pos.get("lot_size", 0),
+                "open_price": pos.get("entry_price", 0),
+                "current_price": pos.get("current_price", 0),
+                "pnl": pos.get("pnl", 0),
                 "swap": pos.get("swap", 0),
                 "comment": pos.get("comment", ""),
             }
@@ -530,12 +530,24 @@ def register_trading_tools(mcp):
             else:
                 state = "UNHEDGED"
 
-            # Recommendation
+            # Recommendation — dynamic hedge threshold based on planned risk
+            # Get max risk_usd from DB for this symbol's open trades
+            basket_tickets = [leg["ticket"] for leg in all_legs]
+            if basket_tickets:
+                placeholders = ",".join(["%s"] * len(basket_tickets))
+                risk_row = execute_one(
+                    f"SELECT MAX(risk_usd) as max_risk FROM trades WHERE user_id = %s AND ticket IN ({placeholders}) AND status = 'open'",
+                    (USER_ID, *basket_tickets)
+                )
+                planned_risk = float(risk_row["max_risk"]) if risk_row and risk_row["max_risk"] else 10.0
+            else:
+                planned_risk = 10.0
+
             if net_pnl > 0:
                 recommendation = "CLOSE_BASKET_PROFIT"
             elif is_hedged and net_pnl < 0:
                 recommendation = "MONITOR_FOR_UNLOCK"
-            elif not is_hedged and net_pnl < -10:
+            elif not is_hedged and net_pnl <= -planned_risk:
                 recommendation = "CONSIDER_HEDGE"
             else:
                 recommendation = "HOLD"
@@ -550,6 +562,8 @@ def register_trading_tools(mcp):
                 "sell_legs": data["sell_legs"],
                 "total_positions": len(all_legs),
                 "is_hedged": is_hedged,
+                "planned_risk_usd": round(planned_risk, 2),
+                "hedge_trigger_at": round(-planned_risk, 2),
                 "recommendation": recommendation,
             }
             baskets.append(basket)

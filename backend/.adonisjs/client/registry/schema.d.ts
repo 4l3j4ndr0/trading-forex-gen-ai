@@ -19,6 +19,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/me_controller').default['show']>>>
     }
   }
+  'pairs.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/pairs'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/pairs_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/pairs_controller').default['index']>>>
+    }
+  }
   'broker.show': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/broker'

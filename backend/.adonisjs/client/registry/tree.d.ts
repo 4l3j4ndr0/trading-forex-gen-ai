@@ -5,6 +5,9 @@ export interface ApiDefinition {
   me: {
     show: typeof routes['me.show']
   }
+  pairs: {
+    index: typeof routes['pairs.index']
+  }
   broker: {
     show: typeof routes['broker.show']
     upsert: typeof routes['broker.upsert']

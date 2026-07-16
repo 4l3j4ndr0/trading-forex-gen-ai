@@ -5,6 +5,7 @@ type ParamValue = string | number | bigint | boolean
 export type ScannedRoutes = {
   ALL: {
     'me.show': { paramsTuple?: []; params?: {} }
+    'pairs.index': { paramsTuple?: []; params?: {} }
     'broker.show': { paramsTuple?: []; params?: {} }
     'broker.upsert': { paramsTuple?: []; params?: {} }
     'broker.test_connection': { paramsTuple?: []; params?: {} }
@@ -27,6 +28,7 @@ export type ScannedRoutes = {
   }
   GET: {
     'me.show': { paramsTuple?: []; params?: {} }
+    'pairs.index': { paramsTuple?: []; params?: {} }
     'broker.show': { paramsTuple?: []; params?: {} }
     'trading_settings.show': { paramsTuple?: []; params?: {} }
     'trades.index': { paramsTuple?: []; params?: {} }
@@ -43,6 +45,7 @@ export type ScannedRoutes = {
   }
   HEAD: {
     'me.show': { paramsTuple?: []; params?: {} }
+    'pairs.index': { paramsTuple?: []; params?: {} }
     'broker.show': { paramsTuple?: []; params?: {} }
     'trading_settings.show': { paramsTuple?: []; params?: {} }
     'trades.index': { paramsTuple?: []; params?: {} }

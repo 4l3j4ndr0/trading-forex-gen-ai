@@ -8,8 +8,8 @@ export const controllers = {
   Daily: () => import('#controllers/daily_controller'),
   Logs: () => import('#controllers/logs_controller'),
   Me: () => import('#controllers/me_controller'),
+  Pairs: () => import('#controllers/pairs_controller'),
   System: () => import('#controllers/system_controller'),
   Trades: () => import('#controllers/trades_controller'),
   TradingSettings: () => import('#controllers/trading_settings_controller'),
-  Pairs: () => import('#controllers/pairs_controller'),
 }
