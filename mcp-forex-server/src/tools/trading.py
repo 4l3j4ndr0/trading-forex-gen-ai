@@ -331,7 +331,7 @@ def register_trading_tools(mcp):
         # --- Reconciliation: detect trades closed by SL/TP in MT5 ---
         mt5_tickets = {pos["ticket"] for pos in positions}
         db_open_trades = execute(
-            "SELECT id, ticket, side, entry_price, sl_pips, pair_id FROM trades WHERE user_id = %s AND status = 'open'",
+            "SELECT id, ticket, side, entry_price, sl_pips, pair_id, opened_at FROM trades WHERE user_id = %s AND status = 'open'",
             (USER_ID,)
         )
 
@@ -364,12 +364,14 @@ def register_trading_tools(mcp):
 
                     rr_achieved = pnl_pips / sl_pips if sl_pips > 0 else 0
 
+                    holding_minutes = (datetime.now(timezone.utc) - trade["opened_at"]).total_seconds() / 60 if trade.get("opened_at") else None
+
                     execute(
                         """UPDATE trades SET exit_price = %s, pnl_pips = %s, pnl_usd = %s, rr_achieved = %s,
-                            close_reason = %s, status = 'closed', closed_at = NOW(), updated_at = NOW()
+                            close_reason = %s, holding_minutes = %s, status = 'closed', closed_at = NOW(), updated_at = NOW()
                         WHERE id = %s""",
                         (exit_price, round(pnl_pips, 1), round(pnl_usd, 2), round(rr_achieved, 2),
-                         close_reason, trade["id"])
+                         close_reason, round(holding_minutes, 1) if holding_minutes else None, trade["id"])
                     )
                     reconciled.append({"ticket": trade["ticket"], "pnl_usd": round(pnl_usd, 2), "reason": close_reason})
                 else:

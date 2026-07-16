@@ -57,17 +57,12 @@
       <div class="row items-center justify-around text-center">
         <div>
           <div class="text-white text-weight-bold number-display">{{ totalOpened }}</div>
-          <div class="text-caption text-grey-5">Opened</div>
+          <div class="text-caption text-grey-5">Trades Abiertos</div>
         </div>
         <q-separator vertical dark />
         <div>
           <div class="text-white text-weight-bold number-display">{{ totalClosed }}</div>
-          <div class="text-caption text-grey-5">Closed</div>
-        </div>
-        <q-separator vertical dark />
-        <div>
-          <div class="text-white text-weight-bold number-display">{{ totalSkipped }}</div>
-          <div class="text-caption text-grey-5">Skipped</div>
+          <div class="text-caption text-grey-5">Trades Cerrados</div>
         </div>
         <q-separator vertical dark />
         <div>
@@ -77,12 +72,12 @@
           >
             {{ totalPnl >= 0 ? '+' : '' }}${{ totalPnl.toFixed(2) }}
           </div>
-          <div class="text-caption text-grey-5">PnL</div>
+          <div class="text-caption text-grey-5">PnL Realizado</div>
         </div>
         <q-separator vertical dark />
         <div>
           <div class="text-white text-weight-bold number-display">{{ meta.total }}</div>
-          <div class="text-caption text-grey-5">Total Logs</div>
+          <div class="text-caption text-grey-5">Ciclos</div>
         </div>
       </div>
     </q-card>
@@ -180,12 +175,11 @@ const dateFilter = ref(new Date().toISOString().split('T')[0])
 const quickDate = ref('today')
 const currentPage = ref(1)
 const loading = ref(false)
-const meta = ref({ total: 0, page: 1, totalPages: 1 })
+const meta = ref({ total: 0, page: 1, totalPages: 1, totals: { opened: 0, closed: 0, realizedPnl: 0 } })
 
-const totalOpened = computed(() => store.hourlyLogs.reduce((s, l) => s + (l.trades_opened || 0), 0))
-const totalClosed = computed(() => store.hourlyLogs.reduce((s, l) => s + (l.trades_closed || 0), 0))
-const totalSkipped = computed(() => store.hourlyLogs.reduce((s, l) => s + (l.trades_skipped || 0), 0))
-const totalPnl = computed(() => store.hourlyLogs.reduce((s, l) => s + Number(l.pnl_this_hour || 0), 0))
+const totalOpened = computed(() => meta.value.totals.opened)
+const totalClosed = computed(() => meta.value.totals.closed)
+const totalPnl = computed(() => meta.value.totals.realizedPnl)
 
 function formatTime(timestamp: string) {
   const d = new Date(timestamp)

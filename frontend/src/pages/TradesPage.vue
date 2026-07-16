@@ -120,7 +120,16 @@ const columns = [
   { name: 'entry_price', label: 'Entry', field: 'entry_price', align: 'right' as const, classes: 'text-grey-4 number-display' },
   { name: 'exit_price', label: 'Exit', field: 'exit_price', align: 'right' as const, format: (v: number) => v || '-', classes: 'number-display' },
   { name: 'pnl_usd', label: 'PnL', field: 'pnl_usd', align: 'right' as const },
-  { name: 'holding_minutes', label: 'Duración', field: 'holding_minutes', align: 'right' as const },
+  { name: 'holding_minutes', label: 'Duración', field: (row: Record<string, unknown>) => {
+    if (row.holding_minutes) return row.holding_minutes as number
+    if (row.opened_at && row.closed_at) {
+      return (new Date(row.closed_at as string).getTime() - new Date(row.opened_at as string).getTime()) / 60000
+    }
+    if (row.opened_at && row.status === 'open') {
+      return (Date.now() - new Date(row.opened_at as string).getTime()) / 60000
+    }
+    return null
+  }, align: 'right' as const },
   { name: 'close_reason', label: 'Razón', field: 'close_reason', align: 'center' as const },
 ]
 

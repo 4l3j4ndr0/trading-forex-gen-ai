@@ -12,6 +12,24 @@ export default class LogsController {
     }
 
     const total = await query.clone().count('* as cnt').first()
+
+    // Get real totals from trades table (source of truth)
+    let tradesQuery = db.from('trades').where('user_id', cognito.user.id)
+    let closedQuery = db.from('trades').where('user_id', cognito.user.id).where('status', 'closed')
+
+    if (date) {
+      tradesQuery = tradesQuery.whereRaw("opened_at::date = ?", [date])
+      closedQuery = closedQuery.whereRaw("closed_at::date = ?", [date])
+    }
+
+    const openedCount = await tradesQuery.clone().count('* as cnt').first()
+    const closedAgg = await closedQuery.clone()
+      .select(
+        db.raw('COUNT(*) as cnt'),
+        db.raw('COALESCE(SUM(pnl_usd), 0) as total_pnl'),
+      )
+      .first()
+
     const logs = await query
       .orderBy('created_at', 'desc')
       .limit(Number(limit))
@@ -24,6 +42,11 @@ export default class LogsController {
         page: Number(page),
         limit: Number(limit),
         totalPages: Math.ceil(Number(total?.cnt || 0) / Number(limit)),
+        totals: {
+          opened: Number(openedCount?.cnt || 0),
+          closed: Number(closedAgg?.cnt || 0),
+          realizedPnl: Number(closedAgg?.total_pnl || 0),
+        },
       },
     })
   }

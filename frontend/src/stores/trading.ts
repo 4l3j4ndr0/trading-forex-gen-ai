@@ -106,7 +106,7 @@ export const useTradingStore = defineStore('trading', {
     async loadLogs(date?: string, page = 1, limit = 25) {
       const params: Record<string, unknown> = { page, limit }
       if (date) params.date = date
-      const res = await api.get<{ data: HourlyLog[]; meta: { total: number; page: number; totalPages: number } }>('/logs/hourly', params)
+      const res = await api.get<{ data: HourlyLog[]; meta: { total: number; page: number; totalPages: number; totals: { opened: number; closed: number; realizedPnl: number } } }>('/logs/hourly', params)
       this.hourlyLogs = res.data
       return res.meta
     },
