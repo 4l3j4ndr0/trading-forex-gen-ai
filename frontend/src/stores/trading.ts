@@ -103,9 +103,12 @@ export const useTradingStore = defineStore('trading', {
       this.stats = res.data
     },
 
-    async loadLogs(date?: string) {
-      const res = await api.get<{ data: HourlyLog[] }>('/logs/hourly', date ? { date } : {})
+    async loadLogs(date?: string, page = 1, limit = 25) {
+      const params: Record<string, unknown> = { page, limit }
+      if (date) params.date = date
+      const res = await api.get<{ data: HourlyLog[]; meta: { total: number; page: number; totalPages: number } }>('/logs/hourly', params)
       this.hourlyLogs = res.data
+      return res.meta
     },
 
     async toggleKillSwitch(enabled: boolean) {
