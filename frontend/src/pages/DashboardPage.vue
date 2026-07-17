@@ -275,6 +275,7 @@ const positionColumns = [
   { name: 'side', label: 'Side', field: 'side', align: 'center' as const },
   { name: 'lot_size', label: 'Lotes', field: 'lot_size', align: 'right' as const, format: (v: number | string) => Number(v).toFixed(2) },
   { name: 'entry_price', label: 'Entrada', field: 'entry_price', align: 'right' as const, classes: 'text-grey-4 number-display' },
+  { name: 'current_price', label: 'Actual', field: 'current_price', align: 'right' as const, classes: 'text-white number-display', format: (v: number | string) => v || '-' },
   { name: 'pnl_usd', label: 'PnL', field: 'pnl_usd', align: 'right' as const },
 ]
 

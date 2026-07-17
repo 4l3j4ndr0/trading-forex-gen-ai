@@ -1,5 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
+import env from '#start/env'
 
 export default class TradesController {
   async index({ cognito, request, response }: HttpContext) {
@@ -62,6 +63,31 @@ export default class TradesController {
       .where('trades.status', 'open')
       .select('trades.*', 'pairs.symbol as symbol')
       .orderBy('trades.opened_at', 'desc')
+
+    // Enrich with live PnL from broker
+    try {
+      const bridgeUrl = env.get('MT5_BRIDGE_URL')
+      const bridgeApiKey = env.get('MT5_BRIDGE_API_KEY')
+      const res = await fetch(`${bridgeUrl}/positions`, {
+        headers: { 'X-Bridge-Api-Key': bridgeApiKey, 'X-User-Id': cognito.user.id },
+        signal: AbortSignal.timeout(5000),
+      })
+      const positions = (await res.json()) as { ticket: number; pnl: number; current_price: number; swap: number }[]
+
+      if (Array.isArray(positions)) {
+        const posMap = new Map(positions.map((p) => [p.ticket, p]))
+        for (const trade of trades) {
+          const pos = posMap.get(Number(trade.ticket))
+          if (pos) {
+            trade.pnl_usd = pos.pnl
+            trade.current_price = pos.current_price
+            trade.swap = pos.swap
+          }
+        }
+      }
+    } catch {
+      // Bridge unavailable — return trades without live PnL
+    }
 
     return response.ok({ data: trades })
   }
