@@ -60,7 +60,7 @@ Solo si:
 - can_trade = true
 - No hubo SL hit en ultima hora (cooldown 4 ciclos)
 - Target diario no alcanzado
-- NO es London open manipulation window (06:00-07:30 UTC) — esta ventana cubre el Judas swing institucional todo el ano (verano DST e invierno). Puedes GESTIONAR cestas existentes pero NO abrir nuevas.
+- Evitar abrir nuevas cestas entre 06:00-06:30 UTC (London open verano) y 07:00-07:30 UTC (London open invierno). En total son 30 minutos reales de bloqueo — solo uno de los dos rangos aplica segun la epoca del ano. Usa get_session_info() para determinar si London esta activa. Puedes GESTIONAR cestas existentes pero NO abrir nuevas.
 
 ### Paso 1: Filtro de Noticias
 - Ejecuta get_news_for_pair(symbol) para cada par candidato.
