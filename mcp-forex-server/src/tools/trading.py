@@ -573,7 +573,16 @@ def register_trading_tools(mcp):
                 planned_risk = 10.0
 
             if net_pnl > 0:
-                recommendation = "CLOSE_BASKET_PROFIT"
+                if is_hedged:
+                    # Hedged basket: only close if profit >= 50% of planned risk
+                    min_close_profit = planned_risk * 0.5
+                    if net_pnl >= min_close_profit:
+                        recommendation = "CLOSE_BASKET_PROFIT"
+                    else:
+                        recommendation = "HOLD_FOR_TARGET"
+                else:
+                    # Unhedged: let TP do its job, only flag for manual close
+                    recommendation = "RUNNING_PROFIT"
             elif is_hedged and net_pnl < 0:
                 recommendation = "MONITOR_FOR_UNLOCK"
             elif not is_hedged and net_pnl <= -planned_risk:
@@ -581,13 +590,12 @@ def register_trading_tools(mcp):
             else:
                 recommendation = "HOLD"
 
+            min_close_target = round(planned_risk * 0.5, 2) if is_hedged else round(planned_risk * 1.0, 2)
+
             basket = {
                 "symbol": sym,
                 "state": state,
                 "net_pnl": round(net_pnl, 2),
-                "floating_pnl": round(floating_pnl, 2),
-                "realized_pnl": round(realized_pnl, 2),
-                "basket_id": basket_id_found,
                 "net_lots": net_lots,
                 "direction": "LONG" if net_lots > 0 else "SHORT" if net_lots < 0 else "NEUTRAL",
                 "buy_legs": data["buy_legs"],
@@ -595,6 +603,7 @@ def register_trading_tools(mcp):
                 "total_positions": len(all_legs),
                 "is_hedged": is_hedged,
                 "planned_risk_usd": round(planned_risk, 2),
+                "min_close_profit": min_close_target,
                 "hedge_trigger_at": round(-planned_risk, 2),
                 "recommendation": recommendation,
             }

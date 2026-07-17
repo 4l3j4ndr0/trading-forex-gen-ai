@@ -51,6 +51,7 @@
               <div class="text-caption text-grey q-mt-md">Sizing</div>
               <q-input v-model.number="settings.maxLotSize" outlined dense label="Max lot size" type="number" step="0.01" />
               <q-input v-model.number="settings.maxOpenPositions" outlined dense label="Max posiciones abiertas" type="number" />
+              <q-input v-model.number="settings.maxTradeDurationMinutes" outlined dense label="Duración máxima por trade (minutos)" type="number" step="30" hint="240 = 4 horas" />
 
               <div class="text-caption text-grey q-mt-md">Target</div>
               <q-input v-model.number="settings.dailyTargetPct" outlined dense label="Target diario (%)" type="number" step="0.1" />
@@ -137,6 +138,7 @@ const settings = reactive({
   maxConsecutiveLosses: 5,
   maxLotSize: 0.5,
   maxOpenPositions: 3,
+  maxTradeDurationMinutes: 240,
   dailyTargetPct: 1.0,
   tradingStartUtc: '07:00',
   tradingEndUtc: '21:00',
@@ -185,6 +187,7 @@ async function loadSettings() {
     if (d.session) {
       settings.tradingStartUtc = d.session.tradingStartUtc as string
       settings.tradingEndUtc = d.session.tradingEndUtc as string
+      settings.maxTradeDurationMinutes = (d.session.maxTradeDurationMinutes as number) || 240
     }
     if (d.system) {
       settings.killSwitch = d.system.killSwitch as boolean

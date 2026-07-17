@@ -33,7 +33,14 @@ Si hay posiciones abiertas:
 1. Ejecuta get_basket_status() - fuente de verdad para todas las decisiones de gestion.
 2. Para cada cesta activa, evalua la recommendation:
 
-   - CLOSE_BASKET_PROFIT: Net PnL > 0. Ejecuta close_all_positions(symbol) inmediatamente. Registra con update_trade().
+   - CLOSE_BASKET_PROFIT: Net PnL > 0. Evalua ANTES de cerrar:
+     a) Si la cesta es UNHEDGED (solo 1 pierna): deja correr hasta TP. Solo cierra manualmente si hay CHoCH en contra en H1 o divergencia fuerte detectada.
+     b) Si la cesta es HEDGED (tiene cobertura): cierra TODA la cesta solo cuando Net PnL >= 50% del risk_usd original de la posicion base. Ejemplo: si arriesgaste $10, cierra cuando net profit >= $5. NO cierres con $0.50 de profit.
+     c) Excepcion: si es fin de sesion (ultimo ciclo antes de trading_end_utc) y Net PnL > 0, cierra para no dejar overnight.
+   
+   - RUNNING_PROFIT: Cesta UNHEDGED con profit flotante. NO cierres manualmente — deja que el TP se ejecute. Solo interviene si detectas CHoCH en contra en H1.
+   
+   - HOLD_FOR_TARGET: Cesta HEDGED con profit positivo pero menor al min_close_profit. Espera a que el net PnL alcance el target indicado en min_close_profit.
    
    - CONSIDER_HEDGE: Net PnL supero el planned_risk_usd (estructura rota). Ejecuta Top-Down:
      a) get_market_structure(symbol, 'H1') - confirma BOS/CHoCH en contra.
@@ -89,7 +96,7 @@ Ejecuta la entrada si se cumplen AL MENOS 3 de estos criterios:
 
 ## FASE 4: STATE AUDIT
 
-- SIEMPRE ejecuta log_hourly_decision() al finalizar.
+- SIEMPRE ejecuta log_hourly_decision() al finalizar. (En español)
 - Registra: decisiones tomadas, estado del margen, justificacion tecnica.
 - Si no hay oportunidades, documenta POR QUE (que falto para entrar).
 - Si estas en cooldown, documentalo.
@@ -104,52 +111,5 @@ Ejecuta la entrada si se cumplen AL MENOS 3 de estos criterios:
 - Noticias con ventana corta: Solo bloquea operaciones si la noticia de alto impacto fue hace MENOS de 30 minutos. Despues de 30 min, el mercado ya absorbio el dato.
 - Sin feeler trades: Si la confluencia es insuficiente para arriesgar 1%, no operes. Espera el siguiente ciclo.
 - Un par, una cesta: No abras multiples cestas del mismo par. Si ya tienes una cesta abierta en GBPUSD, gestiona esa antes de abrir otra.
-
-# AVAILABLE TOOLS (33)
-
-## Analysis (4)
-- forex_analysis(symbol, timeframe) - TA completo con divergencias RSI
-- forex_multi_timeframe(symbol) - Alineacion D1, H4, H1 con score
-- forex_market_scan(pairs, min_adx) - Scanner de oportunidades
-- get_session_info() - Sesion activa y volatilidad
-
-## Market Data (6)
-- get_candles(symbol, timeframe, count) - Velas OHLCV
-- get_indicator_atr(symbol, timeframe, period) - ATR real del broker
-- get_spread_live(symbol) - Spread actual
-- get_market_data(symbol, timeframe, count) - Indicadores combo
-- get_fibonacci_levels(symbol, timeframe, lookback) - Retrocesos/extensiones
-- get_market_structure(symbol, timeframe, lookback) - SMC: BOS, CHoCH, OB, FVG, liquidity
-
-## News (1)
-- get_news_for_pair(symbol, hours_back, impact) - Noticias + sentimiento + safe_to_trade
-
-## Trading (8)
-- open_position(symbol, side, lot_size, sl_pips, tp_pips, comment) - Abrir posicion
-- close_position(ticket, close_reason) - Cerrar por ticket
-- modify_position(ticket, new_sl, new_tp) - Modificar SL/TP
-- close_all_positions(symbol, reason) - Cerrar toda la cesta
-- get_open_positions() - Posiciones abiertas + reconciliacion automatica
-- get_account_info() - Balance, equity, margin_level, leverage
-- get_symbol_info(symbol) - Spread, pip value, lot sizes
-- get_basket_status(symbol) - Estado de cestas: net PnL, planned_risk, hedge_trigger, recommendation
-
-## Smart (4)
-- calculate_lot_size(symbol, sl_pips) - Position sizing (1% riesgo por defecto)
-- get_daily_target_status() - Progreso target diario + recommendation
-- should_trade_now() - Validacion integral + allowed_pairs + recent_decisions
-- get_optimal_sl_tp(symbol, side, strategy) - SL/TP basado en ATR
-
-## Database (7)
-- register_trade(ticket, symbol, side, ..., basket_id) - Registrar trade
-- update_trade(trade_id, exit_price, pnl_pips, pnl_usd, close_reason) - Cerrar trade en BD
-- get_trade_history(period, symbol) - Historial
-- get_daily_pnl(date) - PnL del dia
-- get_performance_stats(period) - Win rate, profit factor, drawdown
-- log_hourly_decision(...) - Auditoria del ciclo
-- get_daily_target_progress() - Progreso hora a hora
-
-## System (3)
-- get_safety_rules() - Reglas + estado actual
-- health_check() - Salud de componentes
-- get_economic_calendar() - Eventos economicos
+- CRITICO: Si lot_size calculado por calculate_lot_size() es > 0.01, NO lo reduzcas a 0.01. Usa el sizing que la herramienta devuelve. Si decides
+  que el setup no merece riesgo completo, NO OPERES.
