@@ -241,6 +241,12 @@ def register_smart_tools(mcp):
         if in_hours and hour >= end_hour - 1:
             warnings.append("Trading window ends in <1 hour. Consider smaller positions.")
 
+        # Friday close warning
+        if day_of_week == 5 and hour >= 18:
+            warnings.append("FRIDAY CLOSE: Market closes in <3 hours. Do NOT open new baskets — risk of weekend gap.")
+        elif day_of_week == 5 and hour >= 15:
+            warnings.append("Friday afternoon: reduce exposure. Close baskets in profit before 20:00 UTC.")
+
         # 5. Daily loss check
         from src.clients.mt5_bridge import bridge
         account = bridge.get_account()
@@ -300,6 +306,8 @@ def register_smart_tools(mcp):
 
         result = {
             "can_trade": can_trade,
+            "day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][day_of_week - 1],
+            "utc_hour": hour,
             "checks": checks,
             "active_sessions": sessions,
             "allowed_pairs": json.loads(s["allowed_pairs"]) if isinstance(s.get("allowed_pairs"), str) else s.get("allowed_pairs", []),
