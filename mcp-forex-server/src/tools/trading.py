@@ -517,11 +517,30 @@ def register_trading_tools(mcp):
 
         for sym, data in baskets_map.items():
             all_legs = data["buy_legs"] + data["sell_legs"]
-            net_pnl = sum(leg["pnl"] + leg["swap"] for leg in all_legs)
-            total_floating += net_pnl
+            floating_pnl = sum(leg["pnl"] + leg["swap"] for leg in all_legs)
+            total_floating += floating_pnl
 
             is_hedged = bool(data["buy_legs"] and data["sell_legs"])
             net_lots = round(data["total_buy_lots"] - data["total_sell_lots"], 2)
+
+            # Get realized PnL from closed legs of the same basket
+            # Find basket_id for this symbol
+            basket_row = execute_one(
+                "SELECT basket_id FROM trades WHERE user_id = %s AND status = 'open' AND basket_id IS NOT NULL AND basket_id LIKE %s ORDER BY opened_at DESC LIMIT 1",
+                (USER_ID, f"{sym}%")
+            )
+            realized_pnl = 0.0
+            basket_id_found = None
+            if basket_row and basket_row["basket_id"]:
+                basket_id_found = basket_row["basket_id"]
+                closed_row = execute_one(
+                    "SELECT COALESCE(SUM(pnl_usd), 0) as total FROM trades WHERE user_id = %s AND basket_id = %s AND status = 'closed'",
+                    (USER_ID, basket_id_found)
+                )
+                realized_pnl = float(closed_row["total"]) if closed_row and closed_row["total"] else 0.0
+
+            # Net PnL = floating (active legs) + realized (closed legs of same basket)
+            net_pnl = floating_pnl + realized_pnl
 
             # Determine basket state
             if is_hedged:
@@ -558,6 +577,9 @@ def register_trading_tools(mcp):
                 "symbol": sym,
                 "state": state,
                 "net_pnl": round(net_pnl, 2),
+                "floating_pnl": round(floating_pnl, 2),
+                "realized_pnl": round(realized_pnl, 2),
+                "basket_id": basket_id_found,
                 "net_lots": net_lots,
                 "direction": "LONG" if net_lots > 0 else "SHORT" if net_lots < 0 else "NEUTRAL",
                 "buy_legs": data["buy_legs"],
