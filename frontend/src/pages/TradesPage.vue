@@ -65,6 +65,12 @@
           </q-td>
         </template>
 
+        <template #body-cell-spread_cost_usd="props">
+          <q-td :props="props" class="text-grey-5 number-display">
+            {{ props.value ? '-$' + Number(props.value).toFixed(2) : '-' }}
+          </q-td>
+        </template>
+
         <template #body-cell-close_reason="props">
           <q-td :props="props">
             <q-chip
@@ -120,6 +126,7 @@ const columns = [
   { name: 'entry_price', label: 'Entry', field: 'entry_price', align: 'right' as const, classes: 'text-grey-4 number-display' },
   { name: 'exit_price', label: 'Exit', field: 'exit_price', align: 'right' as const, format: (v: number) => v || '-', classes: 'number-display' },
   { name: 'pnl_usd', label: 'PnL', field: 'pnl_usd', align: 'right' as const },
+  { name: 'spread_cost_usd', label: 'Spread', field: 'spread_cost_usd', align: 'right' as const },
   { name: 'holding_minutes', label: 'Duración', field: (row: Record<string, unknown>) => {
     if (row.holding_minutes) return row.holding_minutes as number
     if (row.opened_at && row.closed_at) {

@@ -39,4 +39,16 @@ export interface ApiDefinition {
     status: typeof routes['system.status']
     killSwitch: typeof routes['system.kill_switch']
   }
+  sp500Settings: {
+    show: typeof routes['sp_500_settings.show']
+    upsert: typeof routes['sp_500_settings.upsert']
+  }
+  sp500Trades: {
+    index: typeof routes['sp_500_trades.index']
+    open: typeof routes['sp_500_trades.open']
+    stats: typeof routes['sp_500_trades.stats']
+  }
+  sp500Logs: {
+    index: typeof routes['sp_500_logs.index']
+  }
 }

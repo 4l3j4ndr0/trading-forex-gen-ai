@@ -159,6 +159,10 @@ def register_trading_tools(mcp):
         pip_value = sym_info.get("pip_value", 10.0) if "error" not in sym_info else 10.0
         risk_usd = sl_pips * pip_value * lot_size
 
+        # Calculate spread cost (exact at entry moment)
+        spread_pips = round((tick["ask"] - tick["bid"]) / pip_size, 1)
+        spread_cost_usd = round(spread_pips * pip_value * lot_size, 4)
+
         # Get pair_id
         pair = execute_one("SELECT id FROM pairs WHERE symbol = %s", (symbol,))
         pair_id = pair["id"] if pair else 1
@@ -166,11 +170,12 @@ def register_trading_tools(mcp):
         # Register in DB
         row = execute_insert(
             """INSERT INTO trades (user_id, pair_id, ticket, side, lot_size, entry_price, sl_price, tp_price,
-                sl_pips, tp_pips, risk_usd, rr_ratio, comment, status, opened_at, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'open', NOW(), NOW())
+                sl_pips, tp_pips, risk_usd, rr_ratio, spread_pips, spread_cost_usd, comment, status, opened_at, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'open', NOW(), NOW())
             RETURNING id""",
             (USER_ID, pair_id, result["ticket"], side.upper(), lot_size, result["entry_price"],
-             sl_price, tp_price, sl_pips, tp_pips, round(risk_usd, 2), round(rr, 2), comment)
+             sl_price, tp_price, sl_pips, tp_pips, round(risk_usd, 2), round(rr, 2),
+             spread_pips, spread_cost_usd, comment)
         )
 
         return json.dumps({
@@ -187,6 +192,8 @@ def register_trading_tools(mcp):
             "tp_pips": tp_pips,
             "rr_ratio": round(rr, 2),
             "risk_usd": round(risk_usd, 2),
+            "spread_pips": spread_pips,
+            "spread_cost_usd": spread_cost_usd,
         })
 
     @mcp.tool()
@@ -214,11 +221,12 @@ def register_trading_tools(mcp):
 
         exit_price = result.get("exit_price", 0)
         entry_price = float(trade["entry_price"])
-        pip_size = 0.01 if "JPY" in trade["symbol"] else 0.0001
 
         # Get symbol from pair
         pair = execute_one("SELECT symbol FROM pairs WHERE id = %s", (trade["pair_id"],))
         symbol = pair["symbol"] if pair else ""
+
+        pip_size = 0.01 if "JPY" in symbol else 0.0001
 
         if trade["side"] == "BUY":
             pnl_pips = (exit_price - entry_price) / pip_size

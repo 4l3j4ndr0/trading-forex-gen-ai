@@ -259,4 +259,76 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/system_controller').default['killSwitch']>>>
     }
   }
+  'sp_500_settings.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/sp500/settings'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/sp500_settings_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/sp500_settings_controller').default['show']>>>
+    }
+  }
+  'sp_500_settings.upsert': {
+    methods: ["PUT"]
+    pattern: '/api/v1/sp500/settings'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/sp500_settings_controller').default['upsert']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/sp500_settings_controller').default['upsert']>>>
+    }
+  }
+  'sp_500_trades.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/sp500/trades'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/sp500_trades_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/sp500_trades_controller').default['index']>>>
+    }
+  }
+  'sp_500_trades.open': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/sp500/trades/open'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/sp500_trades_controller').default['open']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/sp500_trades_controller').default['open']>>>
+    }
+  }
+  'sp_500_trades.stats': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/sp500/trades/stats'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/sp500_trades_controller').default['stats']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/sp500_trades_controller').default['stats']>>>
+    }
+  }
+  'sp_500_logs.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/sp500/logs'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/sp500_logs_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/sp500_logs_controller').default['index']>>>
+    }
+  }
 }

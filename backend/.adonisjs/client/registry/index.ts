@@ -132,6 +132,42 @@ const routes = {
     tokens: [{"old":"/api/v1/system/kill-switch","type":0,"val":"api","end":""},{"old":"/api/v1/system/kill-switch","type":0,"val":"v1","end":""},{"old":"/api/v1/system/kill-switch","type":0,"val":"system","end":""},{"old":"/api/v1/system/kill-switch","type":0,"val":"kill-switch","end":""}],
     types: placeholder as Registry['system.kill_switch']['types'],
   },
+  'sp_500_settings.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/sp500/settings',
+    tokens: [{"old":"/api/v1/sp500/settings","type":0,"val":"api","end":""},{"old":"/api/v1/sp500/settings","type":0,"val":"v1","end":""},{"old":"/api/v1/sp500/settings","type":0,"val":"sp500","end":""},{"old":"/api/v1/sp500/settings","type":0,"val":"settings","end":""}],
+    types: placeholder as Registry['sp_500_settings.show']['types'],
+  },
+  'sp_500_settings.upsert': {
+    methods: ["PUT"],
+    pattern: '/api/v1/sp500/settings',
+    tokens: [{"old":"/api/v1/sp500/settings","type":0,"val":"api","end":""},{"old":"/api/v1/sp500/settings","type":0,"val":"v1","end":""},{"old":"/api/v1/sp500/settings","type":0,"val":"sp500","end":""},{"old":"/api/v1/sp500/settings","type":0,"val":"settings","end":""}],
+    types: placeholder as Registry['sp_500_settings.upsert']['types'],
+  },
+  'sp_500_trades.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/sp500/trades',
+    tokens: [{"old":"/api/v1/sp500/trades","type":0,"val":"api","end":""},{"old":"/api/v1/sp500/trades","type":0,"val":"v1","end":""},{"old":"/api/v1/sp500/trades","type":0,"val":"sp500","end":""},{"old":"/api/v1/sp500/trades","type":0,"val":"trades","end":""}],
+    types: placeholder as Registry['sp_500_trades.index']['types'],
+  },
+  'sp_500_trades.open': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/sp500/trades/open',
+    tokens: [{"old":"/api/v1/sp500/trades/open","type":0,"val":"api","end":""},{"old":"/api/v1/sp500/trades/open","type":0,"val":"v1","end":""},{"old":"/api/v1/sp500/trades/open","type":0,"val":"sp500","end":""},{"old":"/api/v1/sp500/trades/open","type":0,"val":"trades","end":""},{"old":"/api/v1/sp500/trades/open","type":0,"val":"open","end":""}],
+    types: placeholder as Registry['sp_500_trades.open']['types'],
+  },
+  'sp_500_trades.stats': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/sp500/trades/stats',
+    tokens: [{"old":"/api/v1/sp500/trades/stats","type":0,"val":"api","end":""},{"old":"/api/v1/sp500/trades/stats","type":0,"val":"v1","end":""},{"old":"/api/v1/sp500/trades/stats","type":0,"val":"sp500","end":""},{"old":"/api/v1/sp500/trades/stats","type":0,"val":"trades","end":""},{"old":"/api/v1/sp500/trades/stats","type":0,"val":"stats","end":""}],
+    types: placeholder as Registry['sp_500_trades.stats']['types'],
+  },
+  'sp_500_logs.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/sp500/logs',
+    tokens: [{"old":"/api/v1/sp500/logs","type":0,"val":"api","end":""},{"old":"/api/v1/sp500/logs","type":0,"val":"v1","end":""},{"old":"/api/v1/sp500/logs","type":0,"val":"sp500","end":""},{"old":"/api/v1/sp500/logs","type":0,"val":"logs","end":""}],
+    types: placeholder as Registry['sp_500_logs.index']['types'],
+  },
 } as const satisfies Record<string, AdonisEndpoint>
 
 export { routes }

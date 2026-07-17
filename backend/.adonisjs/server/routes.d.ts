@@ -25,6 +25,12 @@ export type ScannedRoutes = {
     'system.health': { paramsTuple?: []; params?: {} }
     'system.status': { paramsTuple?: []; params?: {} }
     'system.kill_switch': { paramsTuple?: []; params?: {} }
+    'sp_500_settings.show': { paramsTuple?: []; params?: {} }
+    'sp_500_settings.upsert': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.index': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.open': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.stats': { paramsTuple?: []; params?: {} }
+    'sp_500_logs.index': { paramsTuple?: []; params?: {} }
   }
   GET: {
     'me.show': { paramsTuple?: []; params?: {} }
@@ -42,6 +48,11 @@ export type ScannedRoutes = {
     'logs.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'system.health': { paramsTuple?: []; params?: {} }
     'system.status': { paramsTuple?: []; params?: {} }
+    'sp_500_settings.show': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.index': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.open': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.stats': { paramsTuple?: []; params?: {} }
+    'sp_500_logs.index': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
     'me.show': { paramsTuple?: []; params?: {} }
@@ -59,6 +70,11 @@ export type ScannedRoutes = {
     'logs.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'system.health': { paramsTuple?: []; params?: {} }
     'system.status': { paramsTuple?: []; params?: {} }
+    'sp_500_settings.show': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.index': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.open': { paramsTuple?: []; params?: {} }
+    'sp_500_trades.stats': { paramsTuple?: []; params?: {} }
+    'sp_500_logs.index': { paramsTuple?: []; params?: {} }
   }
   POST: {
     'broker.upsert': { paramsTuple?: []; params?: {} }
@@ -71,6 +87,7 @@ export type ScannedRoutes = {
   }
   PUT: {
     'trading_settings.update': { paramsTuple?: []; params?: {} }
+    'sp_500_settings.upsert': { paramsTuple?: []; params?: {} }
   }
 }
 declare module '@adonisjs/core/types/http' {
