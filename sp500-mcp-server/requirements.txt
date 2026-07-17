@@ -1,0 +1,6 @@
+mcp[cli]==1.9.2
+python-dotenv==1.1.0
+psycopg2-binary==2.9.10
+httpx==0.28.1
+numpy==2.3.0
+pytz==2025.1

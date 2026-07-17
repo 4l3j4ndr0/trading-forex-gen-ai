@@ -68,10 +68,30 @@
       <!-- Navigation -->
       <q-scroll-area style="height: calc(100% - 80px)">
         <q-list padding class="q-px-sm text-grey-5">
-          <q-item-label header class="label-mini q-pt-md">Trading</q-item-label>
+          <q-item-label header class="label-mini q-pt-md">Forex</q-item-label>
 
           <q-item
             v-for="item in navItems"
+            :key="item.path"
+            clickable
+            v-ripple
+            :to="item.path"
+            class="nav-item"
+            active-class="nav-item--active"
+          >
+            <q-item-section avatar style="min-width: 40px">
+              <q-icon :name="item.icon" />
+            </q-item-section>
+            <q-item-section class="text-weight-medium">{{ item.label }}</q-item-section>
+            <q-item-section v-if="item.badge" side>
+              <q-badge color="warning" text-color="dark" rounded>{{ item.badge }}</q-badge>
+            </q-item-section>
+          </q-item>
+
+          <q-item-label header class="label-mini q-mt-lg">SP500</q-item-label>
+
+          <q-item
+            v-for="item in sp500NavItems"
             :key="item.path"
             clickable
             v-ripple
@@ -138,7 +158,14 @@ const navItems = computed(() => [
     badge: tradingStore.openPositions > 0 ? tradingStore.openPositions : null,
   },
   { path: '/logs', icon: 'terminal', label: 'Agent Logs', badge: null },
-  { path: '/settings', icon: 'tune', label: 'Configuración', badge: null },
+  { path: '/settings', icon: 'tune', label: 'Configuracion', badge: null },
+])
+
+const sp500NavItems = computed(() => [
+  { path: '/sp500', icon: 'show_chart', label: 'Dashboard', badge: null },
+  { path: '/sp500/trades', icon: 'receipt_long', label: 'Trades', badge: null },
+  { path: '/sp500/logs', icon: 'terminal', label: 'Agent Logs', badge: null },
+  { path: '/sp500/settings', icon: 'tune', label: 'Settings', badge: null },
 ])
 
 function toggleLeftDrawer() {

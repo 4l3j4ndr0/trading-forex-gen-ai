@@ -19,6 +19,11 @@ const routes: RouteRecordRaw[] = [
       { path: 'trades', component: () => import('@/pages/TradesPage.vue') },
       { path: 'logs', component: () => import('@/pages/LogsPage.vue') },
       { path: 'settings', component: () => import('@/pages/SettingsPage.vue') },
+      // SP500
+      { path: 'sp500', component: () => import('@/pages/sp500/SP500DashboardPage.vue') },
+      { path: 'sp500/trades', component: () => import('@/pages/sp500/SP500TradesPage.vue') },
+      { path: 'sp500/logs', component: () => import('@/pages/sp500/SP500LogsPage.vue') },
+      { path: 'sp500/settings', component: () => import('@/pages/sp500/SP500SettingsPage.vue') },
     ],
   },
   {

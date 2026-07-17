@@ -141,6 +141,133 @@ export class PairSchema extends BaseModel {
   declare symbol: string
 }
 
+export class Sp500LogSchema extends BaseModel {
+  static $columns = ['createdAt', 'decision', 'floatingPnl', 'id', 'tradesClosed', 'tradesOpened', 'userId'] as const
+  $columns = Sp500LogSchema.$columns
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare decision: string
+  @column()
+  declare floatingPnl: string | null
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare tradesClosed: number | null
+  @column()
+  declare tradesOpened: number | null
+  @column()
+  declare userId: string
+}
+
+export class Sp500SettingSchema extends BaseModel {
+  static $columns = ['amKillzoneEnd', 'amKillzoneStart', 'autoTradingEnabled', 'createdAt', 'dailyTargetPct', 'dailyTargetPoints', 'id', 'killSwitch', 'maxConsecutiveLosses', 'maxDailyLossPct', 'maxLot', 'maxOpenPositions', 'maxRiskPerTradePct', 'minLot', 'minRrRatio', 'minStructureScore', 'minSweepDistancePoints', 'newsBufferMinutes', 'pmKillzoneEnd', 'pmKillzoneStart', 'pointValue', 'premarketStart', 'regularSessionEnd', 'regularSessionStart', 'symbol', 'updatedAt', 'userId'] as const
+  $columns = Sp500SettingSchema.$columns
+  @column()
+  declare amKillzoneEnd: string
+  @column()
+  declare amKillzoneStart: string
+  @column()
+  declare autoTradingEnabled: boolean
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare dailyTargetPct: string
+  @column()
+  declare dailyTargetPoints: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare killSwitch: boolean
+  @column()
+  declare maxConsecutiveLosses: number
+  @column()
+  declare maxDailyLossPct: string
+  @column()
+  declare maxLot: string
+  @column()
+  declare maxOpenPositions: number
+  @column()
+  declare maxRiskPerTradePct: string
+  @column()
+  declare minLot: string
+  @column()
+  declare minRrRatio: string
+  @column()
+  declare minStructureScore: number
+  @column()
+  declare minSweepDistancePoints: string
+  @column()
+  declare newsBufferMinutes: number
+  @column()
+  declare pmKillzoneEnd: string
+  @column()
+  declare pmKillzoneStart: string
+  @column()
+  declare pointValue: string
+  @column()
+  declare premarketStart: string
+  @column()
+  declare regularSessionEnd: string
+  @column()
+  declare regularSessionStart: string
+  @column()
+  declare symbol: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+  @column()
+  declare userId: string
+}
+
+export class Sp500TradeSchema extends BaseModel {
+  static $columns = ['basketId', 'closeReason', 'closedAt', 'comment', 'createdAt', 'entryPrice', 'exitPrice', 'holdingMinutes', 'id', 'lotSize', 'openedAt', 'pnlPoints', 'pnlUsd', 'riskUsd', 'side', 'slPoints', 'slPrice', 'status', 'ticket', 'tpPoints', 'tpPrice', 'userId'] as const
+  $columns = Sp500TradeSchema.$columns
+  @column()
+  declare basketId: string | null
+  @column()
+  declare closeReason: string | null
+  @column.dateTime()
+  declare closedAt: DateTime | null
+  @column()
+  declare comment: string | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare entryPrice: string
+  @column()
+  declare exitPrice: string | null
+  @column()
+  declare holdingMinutes: number | null
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare lotSize: string
+  @column.dateTime()
+  declare openedAt: DateTime
+  @column()
+  declare pnlPoints: string | null
+  @column()
+  declare pnlUsd: string | null
+  @column()
+  declare riskUsd: string | null
+  @column()
+  declare side: string
+  @column()
+  declare slPoints: string | null
+  @column()
+  declare slPrice: string | null
+  @column()
+  declare status: string
+  @column()
+  declare ticket: bigint | number
+  @column()
+  declare tpPoints: string | null
+  @column()
+  declare tpPrice: string | null
+  @column()
+  declare userId: string
+}
+
 export class TradeSchema extends BaseModel {
   static $columns = ['basketId', 'closeReason', 'closedAt', 'comment', 'commission', 'createdAt', 'entryPrice', 'exitPrice', 'holdingMinutes', 'hourlyLogId', 'id', 'lotSize', 'openedAt', 'pairId', 'pnlPips', 'pnlUsd', 'riskUsd', 'rrAchieved', 'rrRatio', 'side', 'slPips', 'slPrice', 'status', 'swap', 'ticket', 'tpPips', 'tpPrice', 'updatedAt', 'userId'] as const
   $columns = TradeSchema.$columns

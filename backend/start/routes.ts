@@ -15,6 +15,9 @@ const TradesController = () => import('#controllers/trades_controller')
 const DailyController = () => import('#controllers/daily_controller')
 const LogsController = () => import('#controllers/logs_controller')
 const SystemController = () => import('#controllers/system_controller')
+const SP500SettingsController = () => import('#controllers/sp500_settings_controller')
+const SP500TradesController = () => import('#controllers/sp500_trades_controller')
+const SP500LogsController = () => import('#controllers/sp500_logs_controller')
 
 // Health
 router.get('/', () => {
@@ -90,4 +93,31 @@ router
     router.post('/kill-switch', [SystemController, 'killSwitch'])
   })
   .prefix('/api/v1/system')
+  .use(middleware.cognito())
+
+// ─── SP500 Settings ────────────────────────────────────────
+router
+  .group(() => {
+    router.get('/', [SP500SettingsController, 'show'])
+    router.put('/', [SP500SettingsController, 'upsert'])
+  })
+  .prefix('/api/v1/sp500/settings')
+  .use(middleware.cognito())
+
+// ─── SP500 Trades ──────────────────────────────────────────
+router
+  .group(() => {
+    router.get('/', [SP500TradesController, 'index'])
+    router.get('/open', [SP500TradesController, 'open'])
+    router.get('/stats', [SP500TradesController, 'stats'])
+  })
+  .prefix('/api/v1/sp500/trades')
+  .use(middleware.cognito())
+
+// ─── SP500 Logs ────────────────────────────────────────────
+router
+  .group(() => {
+    router.get('/', [SP500LogsController, 'index'])
+  })
+  .prefix('/api/v1/sp500/logs')
   .use(middleware.cognito())

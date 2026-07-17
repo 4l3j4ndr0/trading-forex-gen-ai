@@ -12,4 +12,7 @@ export const controllers = {
   System: () => import('#controllers/system_controller'),
   Trades: () => import('#controllers/trades_controller'),
   TradingSettings: () => import('#controllers/trading_settings_controller'),
+  Sp500Settings: () => import('#controllers/sp500_settings_controller'),
+  Sp500Trades: () => import('#controllers/sp500_trades_controller'),
+  Sp500Logs: () => import('#controllers/sp500_logs_controller'),
 }
