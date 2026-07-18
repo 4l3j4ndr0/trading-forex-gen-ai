@@ -23,6 +23,7 @@ from src.tools.risk import register_risk_tools
 from src.tools.news import register_news_tools
 from src.tools.trading import register_trading_tools
 from src.tools.database import register_database_tools
+from src.tools.notifications import register_notification_tools
 
 register_session_tools(mcp)
 register_liquidity_tools(mcp)
@@ -31,6 +32,7 @@ register_risk_tools(mcp)
 register_news_tools(mcp)
 register_trading_tools(mcp)
 register_database_tools(mcp)
+register_notification_tools(mcp)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8001))

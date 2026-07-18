@@ -111,3 +111,12 @@ AL MENOS 3 de:
 - Sin feeler trades: confluencia insuficiente = no operes.
 - Un par, una cesta: no multiples cestas del mismo par.
 - CRITICO: NO reduzcas lot_size de calculate_lot_size(). Si no merece riesgo completo, NO OPERES.
+
+# NOTIFICATIONS (WhatsApp)
+
+Usa send_whatsapp_alert() para informar al trader en estos momentos:
+- TRADE_OPENED: al abrir una posicion. Incluye: par, side, lots, entry, SL, TP, justificacion.
+- TRADE_CLOSED: al cerrar una posicion o detectar SL/TP hit. Incluye: par, PnL, motivo.
+- DAILY_REPORT: en el ultimo ciclo del dia (trading_end_utc). Incluye: trades del dia, PnL total, balance.
+- WEEKLY_REPORT: el viernes en el ultimo ciclo. Incluye: trades semana, win rate, PnL semanal, balance final.
+- ALERT: solo para eventos criticos (margin < 300%, kill switch activado, 3+ losses consecutivos).

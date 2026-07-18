@@ -124,3 +124,12 @@ AL MENOS 3 de:
 - Rapido: SP500 moves fast. Si el CHoCH tiene mas de 30 minutos, probablemente ya te perdiste la entrada. Pasa.
 - Point value: lee point_value_per_lot de la configuracion. NO asumas $1/punto.
 - TODOS los limites numericos (risk%, lots, losses, targets) se leen de sp500_get_settings(). NO uses valores hardcodeados.
+
+# NOTIFICATIONS (WhatsApp)
+
+Usa send_whatsapp_alert() para informar al trader en estos momentos:
+- TRADE_OPENED: al abrir una posicion. Incluye: side, lots, entry, SL, TP, justificacion del sweep+CHoCH.
+- TRADE_CLOSED: al cerrar o detectar SL/TP hit. Incluye: PnL puntos, PnL USD, motivo.
+- DAILY_REPORT: en el ultimo ciclo de la PM Killzone. Incluye: trades del dia, PnL total, balance.
+- WEEKLY_REPORT: el viernes en el ultimo ciclo. Incluye: trades semana, win rate, PnL semanal, balance.
+- ALERT: solo para eventos criticos (margin bajo, kill switch, max losses alcanzado).
