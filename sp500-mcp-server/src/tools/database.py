@@ -193,3 +193,50 @@ def register_database_tools(mcp):
         """, (USER_ID, decision, trades_opened, trades_closed, floating_pnl, now))
 
         return json.dumps({"status": "logged", "time": now.strftime("%H:%M UTC")})
+
+    @mcp.tool()
+    async def sp500_get_settings() -> str:
+        """
+        Returns all SP500 trading configuration from the database.
+        Includes risk parameters, killzone times, targets, and system flags.
+        Call this at the start of each session to know your operating parameters.
+        """
+        from src.clients.database import get_settings
+        settings = get_settings(force_refresh=True)
+
+        return json.dumps({
+            "symbol": settings["symbol"],
+            "point_value_per_lot": settings["point_value"],
+            "lot_range": {
+                "min": settings["min_lot"],
+                "max": settings["max_lot"]
+            },
+            "risk": {
+                "max_risk_per_trade_pct": settings["max_risk_per_trade_pct"],
+                "max_daily_loss_pct": settings["max_daily_loss_pct"],
+                "max_consecutive_losses": settings["max_consecutive_losses"],
+                "min_rr_ratio": settings["min_rr_ratio"],
+                "max_open_positions": settings["max_open_positions"]
+            },
+            "killzones": {
+                "am_start": settings["am_killzone_start"],
+                "am_end": settings["am_killzone_end"],
+                "pm_start": settings["pm_killzone_start"],
+                "pm_end": settings["pm_killzone_end"],
+                "premarket_start": settings["premarket_start"],
+                "regular_session": f"{settings['regular_session_start']}-{settings['regular_session_end']}"
+            },
+            "news_buffer_minutes": settings["news_buffer_minutes"],
+            "targets": {
+                "daily_target_pct": settings["daily_target_pct"],
+                "daily_target_points": settings["daily_target_points"]
+            },
+            "filters": {
+                "min_structure_score": settings["min_structure_score"],
+                "min_sweep_distance_points": settings["min_sweep_distance_points"]
+            },
+            "system": {
+                "kill_switch": settings["kill_switch"],
+                "auto_trading_enabled": settings["auto_trading_enabled"]
+            }
+        })
