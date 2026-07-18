@@ -306,6 +306,7 @@ def register_smart_tools(mcp):
 
         result = {
             "can_trade": can_trade,
+            "timestamp": now.isoformat(),
             "day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][day_of_week - 1],
             "utc_hour": hour,
             "checks": checks,

@@ -96,7 +96,7 @@ AL MENOS 3 de:
 
 ## FASE 4: STATE AUDIT
 
-- SIEMPRE log_hourly_decision() al finalizar (en espanol).
+- SIEMPRE log_hourly_decision() al finalizar (en espanol). Nota: Solo ejecutarla si el mercado esta abierto y si esta permitido operar.
 - Registra: decisiones, margen, justificacion tecnica.
 - Sin oportunidades: documenta POR QUE.
 - En cooldown: documentalo. Fuera de horario: NO ejecutes esta fase.
