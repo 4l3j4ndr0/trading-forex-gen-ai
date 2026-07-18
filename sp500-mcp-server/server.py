@@ -34,4 +34,12 @@ register_database_tools(mcp)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8001))
-    mcp.run(transport="sse", host="0.0.0.0", port=port)
+    host = os.getenv("HOST", "0.0.0.0")
+
+    app = mcp.sse_app()
+
+    import uvicorn
+    print(f"🚀 SP500 MCP Server on http://{host}:{port}")
+    print(f"📡 Transport: SSE")
+    print(f"📊 Tools: session, liquidity, structure, risk, news, trading, database")
+    uvicorn.run(app, host=host, port=port)
