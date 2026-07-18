@@ -2,8 +2,8 @@ import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 
 export default class SP500LogsController {
-  async index({ auth, request, response }: HttpContext) {
-    const userId = auth.user!.id
+  async index({ cognito, request, response }: HttpContext) {
+    const userId = cognito.user.id
     const page = request.input('page', 1)
     const limit = request.input('limit', 25)
     const date = request.input('date')

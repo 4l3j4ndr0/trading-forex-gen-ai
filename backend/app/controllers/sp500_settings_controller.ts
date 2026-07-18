@@ -2,8 +2,8 @@ import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 
 export default class SP500SettingsController {
-  async show({ auth, response }: HttpContext) {
-    const userId = auth.user!.id
+  async show({ cognito, response }: HttpContext) {
+    const userId = cognito.user.id
     const row = await db.from('sp500_settings').where('user_id', userId).first()
 
     if (!row) {
@@ -39,8 +39,8 @@ export default class SP500SettingsController {
     })
   }
 
-  async upsert({ auth, request, response }: HttpContext) {
-    const userId = auth.user!.id
+  async upsert({ cognito, request, response }: HttpContext) {
+    const userId = cognito.user.id
     const body = request.body()
 
     const payload = {
@@ -80,7 +80,7 @@ export default class SP500SettingsController {
     if (exists) {
       await db.from('sp500_settings').where('user_id', userId).update(cleanPayload)
     } else {
-      await db.from('sp500_settings').insert({ ...cleanPayload, created_at: new Date() })
+      await db.table('sp500_settings').insert({ ...cleanPayload, created_at: new Date() })
     }
 
     return response.json({ message: 'SP500 settings saved' })

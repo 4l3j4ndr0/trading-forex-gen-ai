@@ -2,8 +2,8 @@ import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 
 export default class SP500TradesController {
-  async index({ auth, request, response }: HttpContext) {
-    const userId = auth.user!.id
+  async index({ cognito, request, response }: HttpContext) {
+    const userId = cognito.user.id
     const page = request.input('page', 1)
     const limit = request.input('limit', 25)
     const status = request.input('status')
@@ -49,8 +49,8 @@ export default class SP500TradesController {
     })
   }
 
-  async open({ auth, response }: HttpContext) {
-    const userId = auth.user!.id
+  async open({ cognito, response }: HttpContext) {
+    const userId = cognito.user.id
     const trades = await db.from('sp500_trades')
       .where('user_id', userId)
       .where('status', 'open')
@@ -76,8 +76,8 @@ export default class SP500TradesController {
     })
   }
 
-  async stats({ auth, response }: HttpContext) {
-    const userId = auth.user!.id
+  async stats({ cognito, response }: HttpContext) {
+    const userId = cognito.user.id
 
     const row = await db.from('sp500_trades')
       .where('user_id', userId)
