@@ -1,8 +1,8 @@
 {
-  "name": "forex-trading-frontend",
+  "name": "autotrader-ai",
   "version": "0.0.1",
-  "description": "Trading Forex Gen AI — Frontend Quasar (Vue 3)",
-  "productName": "Forex Trading AI",
+  "description": "AutoTrader AI — Plataforma de trading automatizado con IA",
+  "productName": "AutoTrader AI",
   "author": "4l3j4ndr0 <alejandro.casta3447@gmail.com>",
   "type": "module",
   "private": true,

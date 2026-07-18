@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0f1e"/>
+      <stop offset="100%" style="stop-color:#1a1f3e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4aa"/>
+      <stop offset="100%" style="stop-color:#00a8ff"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4aa;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#00a8ff;stop-opacity:0.1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <!-- Subtle glow circle -->
+  <circle cx="512" cy="480" r="320" fill="url(#glow)"/>
+  <!-- Chart line (trading) -->
+  <polyline points="200,650 350,580 450,620 550,450 650,500 750,350 850,380" 
+    fill="none" stroke="url(#accent)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Upward arrow (profit/growth) -->
+  <polygon points="820,350 850,380 830,380 830,420 810,420 810,380 790,380" 
+    fill="url(#accent)" transform="translate(10,-50) scale(1.5)"/>
+  <!-- AI brain/node dots -->
+  <circle cx="350" cy="580" r="16" fill="#00d4aa"/>
+  <circle cx="550" cy="450" r="16" fill="#00d4aa"/>
+  <circle cx="750" cy="350" r="16" fill="#00a8ff"/>
+  <!-- Connection lines (neural) -->
+  <line x1="350" y1="580" x2="550" y2="450" stroke="#00d4aa" stroke-width="4" opacity="0.4"/>
+  <line x1="550" y1="450" x2="750" y2="350" stroke="#00a8ff" stroke-width="4" opacity="0.4"/>
+  <!-- Text AT -->
+  <text x="512" y="880" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="120" fill="white" opacity="0.9">AT</text>
+</svg>

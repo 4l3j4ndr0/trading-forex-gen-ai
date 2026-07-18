@@ -54,21 +54,16 @@
     <q-drawer v-model="leftDrawerOpen" show-if-above :width="250">
       <!-- Logo -->
       <div class="q-pa-lg flex items-center q-gutter-md border-bottom" style="height: 80px">
-        <div
-          class="bg-primary flex flex-center"
-          style="width: 34px; height: 34px; border-radius: 8px"
-        >
-          <q-icon name="rocket_launch" color="white" size="xs" />
-        </div>
+        <img src="/icons/favicon-128x128.png" style="width: 34px; height: 34px; border-radius: 8px" />
         <div class="text-h6 text-weight-bolder text-white" style="letter-spacing: -0.5px">
-          FX AutoTrader
+          AutoTrader AI
         </div>
       </div>
 
       <!-- Navigation -->
       <q-scroll-area style="height: calc(100% - 80px)">
         <q-list padding class="q-px-sm text-grey-5">
-          <q-item-label header class="label-mini q-pt-md">Forex</q-item-label>
+          <q-item-label header class="label-mini q-pt-md">Trading</q-item-label>
 
           <q-item
             v-for="item in navItems"
