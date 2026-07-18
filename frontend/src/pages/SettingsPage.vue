@@ -38,7 +38,7 @@
         <q-card flat bordered>
           <q-card-section>
             <div class="text-subtitle1 text-weight-medium q-mb-md">
-              <q-icon name="tune" class="q-mr-sm" />Trading Settings
+              <q-icon name="tune" class="q-mr-sm" />Configuracion Trading
             </div>
 
             <q-form @submit.prevent="saveSettings" class="q-gutter-sm">

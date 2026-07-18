@@ -2,7 +2,7 @@
   <q-page padding>
     <div class="row items-center q-mb-lg">
       <q-icon name="tune" size="sm" color="primary" class="q-mr-sm" />
-      <div class="text-h6 text-weight-bold">SP500 Settings</div>
+      <div class="text-h6 text-weight-bold">SP500 Configuracion</div>
     </div>
 
     <div class="row q-col-gutter-lg">

@@ -160,7 +160,7 @@ const sp500NavItems = computed(() => [
   { path: '/sp500', icon: 'show_chart', label: 'Dashboard', badge: null },
   { path: '/sp500/trades', icon: 'receipt_long', label: 'Trades', badge: null },
   { path: '/sp500/logs', icon: 'terminal', label: 'Agent Logs', badge: null },
-  { path: '/sp500/settings', icon: 'tune', label: 'Settings', badge: null },
+  { path: '/sp500/settings', icon: 'tune', label: 'Configuracion', badge: null },
 ])
 
 function toggleLeftDrawer() {

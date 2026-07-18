@@ -39,7 +39,7 @@
       </template>
       <div class="text-weight-bold text-grey-5">Sin conexión al broker</div>
       <div class="text-caption text-grey-6">
-        Configura tu cuenta MT5 en Settings para empezar.
+        Configura tu cuenta MT5 en Configuracion para empezar.
       </div>
     </q-banner>
 
