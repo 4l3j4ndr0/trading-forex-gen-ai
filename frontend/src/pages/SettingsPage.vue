@@ -56,6 +56,9 @@
               <div class="text-caption text-grey q-mt-md">Target</div>
               <q-input v-model.number="settings.dailyTargetPct" outlined dense label="Target diario (%)" type="number" step="0.1" />
 
+              <div class="text-caption text-grey q-mt-md">Protección</div>
+              <q-input v-model.number="settings.newsBufferMinutes" outlined dense label="News buffer (minutos)" type="number" step="15" hint="120 = 2 horas. Tiempo de espera post-noticia" />
+
               <div class="text-caption text-grey q-mt-md">Sesión</div>
               <div class="row q-gutter-sm">
                 <q-input
@@ -139,6 +142,7 @@ const settings = reactive({
   maxLotSize: 0.5,
   maxOpenPositions: 3,
   maxTradeDurationMinutes: 240,
+  newsBufferMinutes: 120,
   dailyTargetPct: 1.0,
   tradingStartUtc: '07:00',
   tradingEndUtc: '21:00',
@@ -188,6 +192,7 @@ async function loadSettings() {
       settings.tradingStartUtc = d.session.tradingStartUtc as string
       settings.tradingEndUtc = d.session.tradingEndUtc as string
       settings.maxTradeDurationMinutes = (d.session.maxTradeDurationMinutes as number) || 240
+      settings.newsBufferMinutes = (d.session.newsBufferMinutes as number) || 120
     }
     if (d.system) {
       settings.killSwitch = d.system.killSwitch as boolean
