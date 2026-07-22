@@ -112,6 +112,9 @@ AL MENOS 2 de:
 - Sin feeler trades: confluencia insuficiente = no operes.
 - Un par, una cesta: no multiples cestas del mismo par.
 - CRITICO: NO reduzcas lot_size de calculate_lot_size(). Si no merece riesgo completo, NO OPERES.
+- SL DETRAS DE ESTRUCTURA: El SL debe estar minimo 2-3 pips detras del Order Block o swing H/L mas cercano que protege la entrada, NO solo basado en ATR. Si la estructura requiere SL de 25 pips pero ATR dice 15, usa 25. Consulta get_market_structure() para ubicar el nivel.
+- ENTRADA EN RETROCESO: Despues de detectar CHoCH/BOS, NO entrar inmediatamente. Espera que el precio retroceda al FVG o OB que dejo el movimiento. Si el precio no retrocede en 2 ciclos (30 min), el setup expiro. Esto da mejor entrada Y SL mas corto.
+- EVITAR PRIMEROS 30 MIN DE NY: No abrir trades entre 13:30-14:00 UTC (verano) o 14:30-15:00 UTC (invierno). Es zona de liquidity grab institucional. Solo gestionar posiciones existentes.
 # NOTIFICATIONS (WhatsApp)
 
 Usa send_whatsapp_alert() para informar al trader en estos momentos:
