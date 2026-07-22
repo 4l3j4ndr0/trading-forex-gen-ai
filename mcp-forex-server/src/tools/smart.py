@@ -221,10 +221,10 @@ def register_smart_tools(mcp):
         # 3. Trading hours
         start_hour = int(str(s.get("trading_start_utc", "07:00")).split(":")[0])
         end_hour = int(str(s.get("trading_end_utc", "21:00")).split(":")[0])
-        in_hours = start_hour <= hour < end_hour
+        in_hours = start_hour <= hour <= end_hour
         checks["session_active"] = {
             "pass": in_hours,
-            "detail": f"Trading hours: {start_hour:02d}:00-{end_hour:02d}:00 UTC. Current: {hour:02d}:00",
+            "detail": f"Trading hours: {start_hour:02d}:00-{end_hour:02d}:59 UTC. Current: {hour:02d}:00",
         }
         if not in_hours:
             blocked_reasons.append(f"Outside trading hours ({start_hour:02d}:00-{end_hour:02d}:00 UTC)")
