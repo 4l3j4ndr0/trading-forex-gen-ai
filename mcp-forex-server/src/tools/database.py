@@ -323,13 +323,32 @@ def register_database_tools(mcp):
         # Open positions
         open_count = execute_one("SELECT COUNT(*) as cnt FROM trades WHERE user_id = %s AND status = 'open'", (USER_ID,))
 
-        # Session
+        # Session (DST-aware using pytz)
+        import pytz
+        from datetime import time as dt_time
+        tokyo_tz = pytz.timezone("Asia/Tokyo")
+        london_tz = pytz.timezone("Europe/London")
+        ny_tz = pytz.timezone("America/New_York")
+
+        now_aware = now.replace(tzinfo=pytz.utc) if now.tzinfo is None else now
+        now_tokyo = now_aware.astimezone(tokyo_tz).time()
+        now_london = now_aware.astimezone(london_tz).time()
+        now_ny = now_aware.astimezone(ny_tz).time()
+
         sessions = []
-        if 7 <= hour < 16:
+        if dt_time(9, 0) <= now_tokyo <= dt_time(18, 0):
+            sessions.append("tokyo")
+        if dt_time(8, 0) <= now_london <= dt_time(17, 0):
             sessions.append("london")
-        if 12 <= hour < 21:
+        if dt_time(8, 0) <= now_ny <= dt_time(17, 0):
             sessions.append("new_york")
-        session = "overlap" if len(sessions) == 2 else (sessions[0] if sessions else "off_hours")
+
+        if len(sessions) >= 2:
+            session = "overlap"
+        elif sessions:
+            session = sessions[0]
+        else:
+            session = "off_hours"
 
         row = execute_insert(
             """INSERT INTO hourly_logs (user_id, timestamp, utc_hour, session, open_positions,

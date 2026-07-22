@@ -176,61 +176,94 @@ def register_analysis_tools(mcp):
     def get_session_info() -> str:
         """
         Get current trading session info: active session, optimal pairs, volatility.
+        Uses pytz with real timezones to handle DST automatically year-round.
 
         Returns:
             Active sessions, optimal pairs for current hour, warnings.
         """
-        now = datetime.now(timezone.utc)
-        hour = now.hour
+        import pytz
+        from datetime import time as dt_time
+
+        now_utc = datetime.now(timezone.utc)
+
+        # Convert to each session's local time
+        tokyo_tz = pytz.timezone("Asia/Tokyo")
+        london_tz = pytz.timezone("Europe/London")
+        ny_tz = pytz.timezone("America/New_York")
+        sydney_tz = pytz.timezone("Australia/Sydney")
+
+        now_tokyo = now_utc.astimezone(tokyo_tz).time()
+        now_london = now_utc.astimezone(london_tz).time()
+        now_ny = now_utc.astimezone(ny_tz).time()
+        now_sydney = now_utc.astimezone(sydney_tz).time()
+
+        # Session hours in LOCAL time (fixed, never change)
+        # Tokyo: 09:00-18:00 JST
+        # London: 08:00-17:00 GMT/BST
+        # New York: 08:00-17:00 EST/EDT
+        # Sydney: 07:00-16:00 AEST/AEDT
 
         sessions = []
-        if 0 <= hour < 9:
+        if dt_time(9, 0) <= now_tokyo <= dt_time(18, 0):
             sessions.append("tokyo")
-        if 7 <= hour < 16:
+        if dt_time(8, 0) <= now_london <= dt_time(17, 0):
             sessions.append("london")
-        if 12 <= hour < 21:
+        if dt_time(8, 0) <= now_ny <= dt_time(17, 0):
             sessions.append("new_york")
+        if dt_time(7, 0) <= now_sydney <= dt_time(16, 0):
+            sessions.append("sydney")
 
         overlap = "london" in sessions and "new_york" in sessions
 
         # Optimal pairs by session
         session_pairs = {
-            "tokyo": ["USDJPY", "AUDUSD"],
-            "london": ["EURUSD", "GBPUSD", "EURGBP", "USDCAD"],
-            "new_york": ["EURUSD", "GBPUSD", "USDJPY", "USDCAD"],
+            "sydney": ["AUDUSD", "NZDUSD"],
+            "tokyo": ["USDJPY", "AUDUSD", "GBPJPY"],
+            "london": ["EURUSD", "GBPUSD", "EURGBP", "USDCAD", "USDCHF"],
+            "new_york": ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "GBPJPY"],
         }
 
         optimal = set()
         for s in sessions:
             optimal.update(session_pairs.get(s, []))
 
-        all_pairs = {"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "EURGBP"}
-        avoid = all_pairs - optimal
+        all_pairs = {"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "EURGBP", "NZDUSD", "USDCHF", "GBPJPY"}
+        avoid = all_pairs - optimal if optimal else set()
 
         # Volatility
         if overlap:
             volatility = "HIGH"
         elif "london" in sessions or "new_york" in sessions:
             volatility = "MEDIUM"
-        else:
+        elif sessions:
             volatility = "LOW"
+        else:
+            volatility = "VERY_LOW"
 
         # Session end warning
         warnings = []
-        if "new_york" in sessions and hour >= 20:
+        if "new_york" in sessions and now_ny >= dt_time(16, 0):
             warnings.append("NY session ending soon. Avoid new positions.")
-        if "london" in sessions and hour >= 15:
+        if "london" in sessions and now_london >= dt_time(16, 0):
             warnings.append("London session ending soon.")
         if not sessions:
             warnings.append("No major session active. Low liquidity expected.")
 
+        # DST info for transparency
+        london_offset = now_utc.astimezone(london_tz).strftime("%z")
+        ny_offset = now_utc.astimezone(ny_tz).strftime("%z")
+
         return json.dumps({
-            "timestamp": now.isoformat(),
-            "utc_hour": hour,
+            "timestamp": now_utc.isoformat(),
+            "utc_hour": now_utc.hour,
             "active_sessions": sessions,
             "overlap": overlap,
             "volatility_level": volatility,
             "optimal_pairs": sorted(optimal),
             "avoid_pairs": sorted(avoid),
             "warnings": warnings,
+            "dst_info": {
+                "london": f"GMT{london_offset}",
+                "new_york": f"ET{ny_offset}",
+            },
         })
