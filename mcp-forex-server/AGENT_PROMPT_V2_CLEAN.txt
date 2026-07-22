@@ -74,19 +74,19 @@ Solo si:
 
 1. forex_multi_timeframe(symbol) - alineacion D1, H4, H1.
 2. get_market_structure(symbol, 'H4') - narrativa, BOS, OBs macro.
+   - REGLA ABSOLUTA: Si H4 bias = BUY, solo puedes entrar BUY. Si H4 bias = SELL, solo SELL. Si H4 = RANGING, NO operar ese par. NUNCA operes contra el H4.
 3. get_market_structure(symbol, 'H1') - POIs (OBs, FVGs sin mitigar).
 4. get_market_structure(symbol, 'M15') - trigger de entrada.
 5. forex_analysis(symbol, 'H1') - divergencias RSI.
 
-### Paso 4: Criterios de Entrada (minimo 2 confluencias)
+### Paso 4: Trade Quality Score (minimo 3 de 5)
 
-AL MENOS 2 de:
-- Alineacion MTF >= |2|
-- Precio en POI macro (OB/FVG H4/D1 sin mitigar)
-- BOS o CHoCH M15 en direccion del trade
-- Rechazo visible (mechas/engulfing) en POI
-- Divergencia RSI a favor
-- ADX > 25 en H1
+Puntua el setup. Solo entra si score >= 3:
+- H4 bias coincide con la direccion del trade (+1) — OBLIGATORIO, sin esto no hay trade
+- Precio dentro de POI macro (OB/FVG H4/D1 sin mitigar) (+1)
+- CHoCH confirmado en M15 en direccion del trade (+1) — BOS solo no basta, necesitas CHoCH
+- Divergencia RSI H1 a favor (+1)
+- Sesion optima para el par (London para EUR/GBP, NY para USD/CAD/JPY) (+1)
 
 ### Paso 5: Ejecucion
 1. calculate_lot_size(symbol, sl_pips) - OBLIGATORIO. 1% riesgo.
