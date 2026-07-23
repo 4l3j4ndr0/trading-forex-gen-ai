@@ -398,22 +398,43 @@ def register_market_data_tools(mcp):
                 elif lh and ll:
                     trend = "BEARISH"
 
-                # BOS: price breaks previous swing
+                # BOS: check if ANY candle in the lookback broke previous swing
+                # (not just current price — captures historical breaks)
                 last_price = candles[-1]["close"]
                 if trend == "BULLISH" and len(recent_highs) >= 2:
                     prev_high = recent_highs[1]["price"]
-                    if last_price > prev_high:
-                        bos = {"type": "bullish", "level": round(prev_high, 6), "candles_ago": recent_highs[1]["candles_ago"]}
+                    # Check if any recent candle broke above prev_high
+                    for j in range(max(0, recent_highs[1]["index"]), len(candles)):
+                        if candles[j]["high"] > prev_high:
+                            candles_ago = len(candles) - 1 - j
+                            bos = {"type": "bullish", "level": round(prev_high, 6), "candles_ago": candles_ago, "confirmed": last_price > prev_high}
+                            break
                 elif trend == "BEARISH" and len(recent_lows) >= 2:
                     prev_low = recent_lows[1]["price"]
-                    if last_price < prev_low:
-                        bos = {"type": "bearish", "level": round(prev_low, 6), "candles_ago": recent_lows[1]["candles_ago"]}
+                    # Check if any recent candle broke below prev_low
+                    for j in range(max(0, recent_lows[1]["index"]), len(candles)):
+                        if candles[j]["low"] < prev_low:
+                            candles_ago = len(candles) - 1 - j
+                            bos = {"type": "bearish", "level": round(prev_low, 6), "candles_ago": candles_ago, "confirmed": last_price < prev_low}
+                            break
 
-                # CHoCH: first sign of reversal
-                if trend == "BULLISH" and ll:
-                    choch = {"type": "bearish_choch", "level": round(recent_lows[1]["price"], 6)}
-                elif trend == "BEARISH" and hh:
-                    choch = {"type": "bullish_choch", "level": round(recent_highs[1]["price"], 6)}
+                # CHoCH: first sign of reversal (structure shift)
+                # Bullish CHoCH: was bearish (LH+LL) but price broke last swing high
+                if trend == "BEARISH" or (lh and ll):
+                    prev_high_level = recent_highs[1]["price"]
+                    for j in range(max(0, recent_highs[1]["index"]), len(candles)):
+                        if candles[j]["high"] > prev_high_level:
+                            candles_ago = len(candles) - 1 - j
+                            choch = {"type": "bullish_choch", "level": round(prev_high_level, 6), "candles_ago": candles_ago}
+                            break
+                # Bearish CHoCH: was bullish (HH+HL) but price broke last swing low
+                elif trend == "BULLISH" or (hh and hl):
+                    prev_low_level = recent_lows[1]["price"]
+                    for j in range(max(0, recent_lows[1]["index"]), len(candles)):
+                        if candles[j]["low"] < prev_low_level:
+                            candles_ago = len(candles) - 1 - j
+                            choch = {"type": "bearish_choch", "level": round(prev_low_level, 6), "candles_ago": candles_ago}
+                            break
 
         # ─── 3. Order Blocks ──────────────────────────────────────
         order_blocks = []

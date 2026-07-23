@@ -79,12 +79,12 @@ Solo si:
 4. get_market_structure(symbol, 'M15') - trigger de entrada.
 5. forex_analysis(symbol, 'H1') - divergencias RSI.
 
-### Paso 4: Trade Quality Score (minimo 3 de 5)
+### Paso 4: Trade Quality Score (minimo 2 de 5)
 
-Puntua el setup. Solo entra si score >= 3:
+Puntua el setup. Solo entra si score >= 2:
 - H4 bias coincide con la direccion del trade (+1) — OBLIGATORIO, sin esto no hay trade
 - Precio dentro de POI macro (OB/FVG H4/D1 sin mitigar) (+1)
-- CHoCH confirmado en M15 en direccion del trade (+1) — BOS solo no basta, necesitas CHoCH
+- BOS o CHoCH confirmado en M15 en direccion del trade (+1) — BOS cuenta si H4 bias es fuerte
 - Divergencia RSI H1 a favor (+1)
 - Sesion optima para el par (London para EUR/GBP, NY para USD/CAD/JPY) (+1)
 
