@@ -436,7 +436,7 @@ def register_smart_tools(mcp):
                 "rr_ratio": rr2,
                 "method": f"{strat['tp2_mult']}× ATR",
             },
-            "recommended_tp": "take_profit_1" if rr1 >= min_rr else "take_profit_2",
+            "recommended_tp": "take_profit_2" if rr2 >= min_rr else "take_profit_1",
             "min_rr_required": min_rr,
-            "valid": rr1 >= min_rr,
+            "valid": rr1 >= min_rr or rr2 >= min_rr,
         })
