@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 
 from src.clients.local_indicators import get_full_analysis
+from src.tools.database import execute_one, USER_ID
 
 
 def register_analysis_tools(mcp):
@@ -95,18 +96,26 @@ def register_analysis_tools(mcp):
         })
 
     @mcp.tool()
-    def forex_market_scan(pairs: str = None, min_adx: float = 25.0) -> str:
+    def forex_market_scan(pairs: str = None, min_adx: float = 0) -> str:
         """
         Scan multiple forex pairs and rank trading opportunities.
         Uses real candles from MT5 broker — no external API dependency.
 
         Args:
             pairs: Comma-separated pairs to scan. Default: all major pairs.
-            min_adx: Minimum ADX threshold for trend strength (default 25).
+            min_adx: Minimum ADX threshold (0 = read from DB settings, default 20).
 
         Returns:
             Ranked opportunities with alignment score, and pairs to skip.
         """
+        # Read min_adx from settings if not provided
+        if min_adx <= 0:
+            settings = execute_one(
+                "SELECT min_adx_entry FROM trading_settings WHERE user_id = %s",
+                (USER_ID,)
+            )
+            min_adx = float(settings["min_adx_entry"]) if settings and settings.get("min_adx_entry") else 20.0
+
         default_pairs = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "EURGBP"]
         scan_pairs = pairs.split(",") if pairs else default_pairs
 
@@ -141,11 +150,12 @@ def register_analysis_tools(mcp):
             adx = h1_data["indicators"]["adx_14"]
             rsi = h1_data["indicators"]["rsi_14"]
 
-            # Filter
-            if adx < min_adx or abs(score) < 2:
+            # Filter — more permissive: let the agent's Quality Score decide
+            # Only skip if BOTH ADX is very low AND score is 0
+            if adx < min_adx and abs(score) < 1:
                 no_trade.append({
                     "symbol": pair,
-                    "reason": f"ADX={adx:.1f}" if adx < min_adx else f"Score={score}",
+                    "reason": f"ADX={adx:.1f}, Score={score}",
                 })
                 continue
 
