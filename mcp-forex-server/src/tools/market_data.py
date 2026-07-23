@@ -375,7 +375,9 @@ def register_market_data_tools(mcp):
             return json.dumps({"error": "Not enough candles for structure analysis"})
 
         # ─── 1. Swing Structure ────────────────────────────────────
-        swing_highs, swing_lows = _find_swing_points(candles, lookback=3)
+        # Use strength=2 for M15/M5 (faster detection), 3 for H1+
+        swing_strength = 2 if timeframe in ("M5", "M15") else 3
+        swing_highs, swing_lows = _find_swing_points(candles, lookback=swing_strength)
 
         # ─── 2. Determine Trend & BOS ─────────────────────────────
         trend = "RANGING"
