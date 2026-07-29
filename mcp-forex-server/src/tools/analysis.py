@@ -108,15 +108,20 @@ def register_analysis_tools(mcp):
         Returns:
             Ranked opportunities with alignment score, and pairs to skip.
         """
-        # Read min_adx from settings if not provided
+        # Read min_adx and allowed_pairs from settings if not provided —
+        # scanning pairs outside allowed_pairs just wastes a cycle, since
+        # open_position() will reject them anyway.
+        settings = execute_one(
+            "SELECT min_adx_entry, allowed_pairs FROM trading_settings WHERE user_id = %s",
+            (USER_ID,)
+        )
         if min_adx <= 0:
-            settings = execute_one(
-                "SELECT min_adx_entry FROM trading_settings WHERE user_id = %s",
-                (USER_ID,)
-            )
             min_adx = float(settings["min_adx_entry"]) if settings and settings.get("min_adx_entry") else 20.0
 
-        default_pairs = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "EURGBP"]
+        db_pairs = settings.get("allowed_pairs") if settings else None
+        if isinstance(db_pairs, str):
+            db_pairs = json.loads(db_pairs)
+        default_pairs = db_pairs or ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "EURGBP"]
         scan_pairs = pairs.split(",") if pairs else default_pairs
 
         opportunities = []
