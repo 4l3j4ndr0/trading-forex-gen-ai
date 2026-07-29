@@ -4,6 +4,12 @@ import MetaTrader5 as mt5
 
 from config import Config
 
+TIMEFRAME_MAP = {
+    "M1": mt5.TIMEFRAME_M1, "M5": mt5.TIMEFRAME_M5, "M15": mt5.TIMEFRAME_M15,
+    "M30": mt5.TIMEFRAME_M30, "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4,
+    "D1": mt5.TIMEFRAME_D1, "W1": mt5.TIMEFRAME_W1, "MN1": mt5.TIMEFRAME_MN1,
+}
+
 
 class MT5Client:
     """MT5 client that connects dynamically based on user credentials."""
@@ -222,11 +228,6 @@ class MT5Client:
         return {"symbol": symbol, "bid": tick.bid, "ask": tick.ask, "time": int(tick.time), "volume": tick.volume}
 
     def get_candles(self, symbol: str, timeframe: str = "H1", count: int = 100, suffix: str = "") -> list | dict:
-        TIMEFRAME_MAP = {
-            "M1": mt5.TIMEFRAME_M1, "M5": mt5.TIMEFRAME_M5, "M15": mt5.TIMEFRAME_M15,
-            "M30": mt5.TIMEFRAME_M30, "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4,
-            "D1": mt5.TIMEFRAME_D1, "W1": mt5.TIMEFRAME_W1, "MN1": mt5.TIMEFRAME_MN1,
-        }
         tf = TIMEFRAME_MAP.get(timeframe)
         if tf is None:
             return {"error": f"Invalid timeframe '{timeframe}'. Use: {list(TIMEFRAME_MAP.keys())}"}
@@ -241,6 +242,39 @@ class MT5Client:
         rates = mt5.copy_rates_from_pos(mt5_sym, tf, 0, count)
         if rates is None or len(rates) == 0:
             return {"error": f"No candle data for {symbol} {timeframe}"}
+
+        return [{"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
+                 "low": float(r["low"]), "close": float(r["close"]), "volume": int(r["tick_volume"])} for r in rates]
+
+    def get_candles_range(self, symbol: str, timeframe: str, date_from: int, date_to: int, suffix: str = "") -> list | dict:
+        """
+        Get candles for an explicit UTC time range (unix seconds).
+        Unlike get_candles() (last N bars from now), this forces MT5 to fetch/sync
+        the requested historical window from the broker server — needed for
+        backtesting, where get_candles() is capped to whatever the terminal has
+        cached locally (often just the last ~1000 bars for intraday timeframes).
+        """
+        tf = TIMEFRAME_MAP.get(timeframe)
+        if tf is None:
+            return {"error": f"Invalid timeframe '{timeframe}'. Use: {list(TIMEFRAME_MAP.keys())}"}
+        if date_to <= date_from:
+            return {"error": "'to' must be after 'from'"}
+
+        mt5_sym = symbol + suffix
+        info = mt5.symbol_info(mt5_sym)
+        if info is None:
+            return {"error": f"Symbol '{symbol}' not found"}
+        if not info.visible:
+            mt5.symbol_select(mt5_sym, True)
+
+        import datetime
+        rates = mt5.copy_rates_range(
+            mt5_sym, tf,
+            datetime.datetime.utcfromtimestamp(date_from),
+            datetime.datetime.utcfromtimestamp(date_to),
+        )
+        if rates is None or len(rates) == 0:
+            return {"error": f"No candle data for {symbol} {timeframe} in range [{date_from}, {date_to}]"}
 
         return [{"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
                  "low": float(r["low"]), "close": float(r["close"]), "volume": int(r["tick_volume"])} for r in rates]
@@ -274,10 +308,22 @@ class MT5Client:
         deals = mt5.history_deals_get(date_from, date_to, position=ticket)
         if deals is None or len(deals) == 0:
             return {"error": f"No deal history found for ticket {ticket}"}
-        # Last deal is the closing one
-        close_deal = deals[-1]
+        # Defensive: history_deals_get(position=ticket) is supposed to filter
+        # server-side, but under rapid concurrent closes it has been observed
+        # returning a stale deal belonging to a different position. Re-check
+        # position_id client-side and refuse to guess if it doesn't match.
+        matching = [d for d in deals if getattr(d, "position_id", ticket) == ticket]
+        if not matching:
+            return {"error": f"Deal history for ticket {ticket} did not match position_id — stale/ambiguous data"}
+        # Last matching deal is the closing one
+        close_deal = matching[-1]
+        symbol = close_deal.symbol
+        if suffix and symbol.endswith(suffix):
+            symbol = symbol[: -len(suffix)]
         return {
             "ticket": ticket,
+            "position_id": close_deal.position_id,
+            "symbol": symbol,
             "price": close_deal.price,
             "profit": close_deal.profit,
             "commission": close_deal.commission,

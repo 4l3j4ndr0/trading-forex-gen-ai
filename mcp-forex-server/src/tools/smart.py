@@ -281,26 +281,44 @@ def register_smart_tools(mcp):
         if not pos_ok:
             blocked_reasons.append(f"Max positions reached ({current_open}/{max_positions})")
 
-        # 6. Consecutive losses
+        # 6. Consecutive losses — time-based cooldown, NOT a permanent lock.
+        # Breaking the streak requires a win, but wins require trading, which was
+        # blocked forever once the last N trades were losses. Fix: after the streak
+        # hits the max, block only for `consecutive_loss_cooldown_minutes` (default
+        # 120min = the "8 ciclos" cooldown the prompt already documents), then allow
+        # trading to resume even if the streak technically hasn't been broken by a win.
         max_con_losses = int(s.get("max_consecutive_losses", 5))
+        cooldown_minutes = int(s.get("consecutive_loss_cooldown_minutes", 120))
         recent = execute(
-            "SELECT pnl_usd FROM trades WHERE user_id = %s AND status = 'closed' ORDER BY closed_at DESC LIMIT %s",
-            (USER_ID, max_con_losses)
+            "SELECT pnl_usd, closed_at FROM trades WHERE user_id = %s AND status = 'closed' ORDER BY closed_at DESC LIMIT %s",
+            (USER_ID, max(max_con_losses * 2, 20))
         )
         consecutive_losses = 0
+        last_loss_at = None  # closed_at of the MOST RECENT loss (rows are DESC by closed_at)
         for r in recent:
-            if r["pnl_usd"] is not None and float(r["pnl_usd"]) <= 0:
+            if r["pnl_usd"] is not None and float(r["pnl_usd"]) < 0:
                 consecutive_losses += 1
+                if last_loss_at is None:
+                    last_loss_at = r["closed_at"]
             else:
-                break
+                break  # win or breakeven trade — streak ends here
 
-        con_ok = consecutive_losses < max_con_losses
-        checks["consecutive_losses_ok"] = {
-            "pass": con_ok,
-            "detail": f"Consecutive losses: {consecutive_losses} (max: {max_con_losses})",
-        }
+        minutes_since_last_loss = None
+        cooldown_active = False
+        if consecutive_losses >= max_con_losses and last_loss_at:
+            minutes_since_last_loss = (now - last_loss_at).total_seconds() / 60
+            cooldown_active = minutes_since_last_loss < cooldown_minutes
+
+        con_ok = not cooldown_active
+        detail = f"Consecutive losses: {consecutive_losses} (max: {max_con_losses})"
+        if minutes_since_last_loss is not None:
+            detail += f". Cooldown: {minutes_since_last_loss:.0f}/{cooldown_minutes} min elapsed since last loss."
+        checks["consecutive_losses_ok"] = {"pass": con_ok, "detail": detail}
         if not con_ok:
-            blocked_reasons.append(f"Too many consecutive losses ({consecutive_losses})")
+            blocked_reasons.append(
+                f"Cooldown activo tras {consecutive_losses} pérdidas consecutivas "
+                f"({minutes_since_last_loss:.0f}/{cooldown_minutes} min)"
+            )
 
         can_trade = len(blocked_reasons) == 0
 

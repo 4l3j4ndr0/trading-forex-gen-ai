@@ -341,18 +341,24 @@ def _generate_recommendation(rsi: float, macd: dict, adx_data: dict, ema_trend: 
     return rec, strength
 
 
-def get_full_analysis(symbol: str, timeframe: str = "H1", count: int = 200) -> dict:
+def get_full_analysis(symbol: str, timeframe: str = "H1", count: int = 200, candles: list[dict] = None) -> dict:
     """
     Full technical analysis using broker candles — replaces TradingView.
 
+    Args:
+        candles: Optional pre-fetched candle list (e.g. a historical slice for
+            backtesting). When omitted, fetches the latest `count` candles from
+            the live bridge as before.
+
     Returns same structure as the old TradingView-based analysis.
     """
-    candle_result = bridge.get_candles(symbol, timeframe, count)
+    if candles is None:
+        candle_result = bridge.get_candles(symbol, timeframe, count)
 
-    if isinstance(candle_result, dict) and "error" in candle_result:
-        return candle_result
+        if isinstance(candle_result, dict) and "error" in candle_result:
+            return candle_result
 
-    candles = candle_result.get("candles", []) if isinstance(candle_result, dict) else candle_result
+        candles = candle_result.get("candles", []) if isinstance(candle_result, dict) else candle_result
 
     if len(candles) < 50:
         return {"error": f"Not enough candles ({len(candles)}). Need at least 50."}

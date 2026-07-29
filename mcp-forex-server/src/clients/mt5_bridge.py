@@ -59,6 +59,10 @@ class MT5BridgeClient:
     def get_candles(self, symbol: str, timeframe: str = "H1", count: int = 100) -> dict:
         return _get(f"/candles/{symbol}", {"timeframe": timeframe, "count": count})
 
+    def get_candles_range(self, symbol: str, timeframe: str, date_from: int, date_to: int) -> dict:
+        """Candles for an explicit UTC unix-seconds range — for backtesting (not capped at 1000 bars)."""
+        return _get(f"/candles_range/{symbol}", {"timeframe": timeframe, "from": date_from, "to": date_to})
+
     def get_atr(self, symbol: str, timeframe: str = "H1", period: int = 14) -> dict:
         return _get(f"/indicator/atr/{symbol}", {"timeframe": timeframe, "period": period})
 

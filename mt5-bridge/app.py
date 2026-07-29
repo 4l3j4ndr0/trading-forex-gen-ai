@@ -121,6 +121,46 @@ def candles(symbol):
     return jsonify({"symbol": symbol, "timeframe": timeframe, "count": len(result), "candles": result})
 
 
+@app.route("/candles_range/<symbol>", methods=["GET"])
+@require_auth
+def candles_range(symbol):
+    """
+    Candles for an explicit UTC date range — for backtesting. Not capped at 1000,
+    since it forces MT5 to sync history from the broker server instead of reading
+    whatever the terminal has cached locally.
+
+    Query params: timeframe (default H1), from, to — either unix seconds or
+    ISO 8601 dates (YYYY-MM-DD or full timestamp).
+    """
+    timeframe = request.args.get("timeframe", "H1").upper()
+    raw_from = request.args.get("from")
+    raw_to = request.args.get("to")
+    if not raw_from or not raw_to:
+        return jsonify({"error": "'from' and 'to' query params are required"}), 400
+
+    def _parse_ts(raw):
+        if raw.isdigit():
+            return int(raw)
+        from datetime import datetime, timezone
+        return int(datetime.fromisoformat(raw).replace(tzinfo=timezone.utc).timestamp())
+
+    try:
+        date_from = _parse_ts(raw_from)
+        date_to = _parse_ts(raw_to)
+    except ValueError:
+        return jsonify({"error": "Invalid 'from'/'to' — use unix seconds or ISO 8601 (YYYY-MM-DD)"}), 400
+
+    # Cap a single request to ~90 days to keep response sizes and MT5 sync time
+    # reasonable; the caller (backtest script) should page across wider ranges.
+    if date_to - date_from > 90 * 86400:
+        return jsonify({"error": "Range too wide — max 90 days per request, page across wider windows"}), 400
+
+    result = mt5_client.get_candles_range(symbol, timeframe, date_from, date_to, suffix=_suffix())
+    if isinstance(result, dict) and "error" in result:
+        return jsonify(result), 400
+    return jsonify({"symbol": symbol, "timeframe": timeframe, "count": len(result), "candles": result})
+
+
 # ─── ATR ──────────────────────────────────────────────────
 
 @app.route("/indicator/atr/<symbol>", methods=["GET"])

@@ -123,6 +123,209 @@ def _find_swing_points(candles: list[dict], lookback: int = 5) -> tuple[list, li
     return swing_highs, swing_lows
 
 
+def _analyze_market_structure(candles: list[dict], symbol: str, timeframe: str) -> dict:
+    """
+    Pure SMC structure analysis (swings, BOS/CHoCH, Order Blocks, FVGs, liquidity, bias).
+    Extracted from get_market_structure() so it can be reused identically by the
+    live MCP tool (which fetches candles from the bridge) and by the backtest
+    engine (which replays cached historical candles) — same logic, same results.
+    """
+    if len(candles) < 30:
+        return {"error": "Not enough candles for structure analysis"}
+
+    # ─── 1. Swing Structure ────────────────────────────────────
+    # Use strength=2 for M15/M5 (faster detection), 3 for H1+
+    swing_strength = 2 if timeframe in ("M5", "M15") else 3
+    swing_highs, swing_lows = _find_swing_points(candles, lookback=swing_strength)
+
+    # ─── 2. Determine Trend & BOS ─────────────────────────────
+    trend = "RANGING"
+    bos = None
+    choch = None
+
+    if len(swing_highs) >= 2 and len(swing_lows) >= 2:
+        # Higher highs + higher lows = bullish
+        recent_highs = sorted(swing_highs, key=lambda x: x["index"], reverse=True)[:3]
+        recent_lows = sorted(swing_lows, key=lambda x: x["index"], reverse=True)[:3]
+
+        if len(recent_highs) >= 2 and len(recent_lows) >= 2:
+            hh = recent_highs[0]["price"] > recent_highs[1]["price"]
+            hl = recent_lows[0]["price"] > recent_lows[1]["price"]
+            lh = recent_highs[0]["price"] < recent_highs[1]["price"]
+            ll = recent_lows[0]["price"] < recent_lows[1]["price"]
+
+            if hh and hl:
+                trend = "BULLISH"
+            elif lh and ll:
+                trend = "BEARISH"
+
+            # BOS: check if ANY candle in the lookback broke previous swing
+            # (not just current price — captures historical breaks)
+            last_price = candles[-1]["close"]
+            if trend == "BULLISH" and len(recent_highs) >= 2:
+                prev_high = recent_highs[1]["price"]
+                # Check if any recent candle broke above prev_high
+                for j in range(max(0, recent_highs[1]["index"]), len(candles)):
+                    if candles[j]["high"] > prev_high:
+                        candles_ago = len(candles) - 1 - j
+                        bos = {"type": "bullish", "level": round(prev_high, 6), "candles_ago": candles_ago, "confirmed": last_price > prev_high}
+                        break
+            elif trend == "BEARISH" and len(recent_lows) >= 2:
+                prev_low = recent_lows[1]["price"]
+                # Check if any recent candle broke below prev_low
+                for j in range(max(0, recent_lows[1]["index"]), len(candles)):
+                    if candles[j]["low"] < prev_low:
+                        candles_ago = len(candles) - 1 - j
+                        bos = {"type": "bearish", "level": round(prev_low, 6), "candles_ago": candles_ago, "confirmed": last_price < prev_low}
+                        break
+
+            # CHoCH: first sign of reversal (structure shift)
+            # Bullish CHoCH: was bearish (LH+LL) but price broke last swing high
+            if trend == "BEARISH" or (lh and ll):
+                prev_high_level = recent_highs[1]["price"]
+                for j in range(max(0, recent_highs[1]["index"]), len(candles)):
+                    if candles[j]["high"] > prev_high_level:
+                        candles_ago = len(candles) - 1 - j
+                        choch = {"type": "bullish_choch", "level": round(prev_high_level, 6), "candles_ago": candles_ago}
+                        break
+            # Bearish CHoCH: was bullish (HH+HL) but price broke last swing low
+            elif trend == "BULLISH" or (hh and hl):
+                prev_low_level = recent_lows[1]["price"]
+                for j in range(max(0, recent_lows[1]["index"]), len(candles)):
+                    if candles[j]["low"] < prev_low_level:
+                        candles_ago = len(candles) - 1 - j
+                        choch = {"type": "bearish_choch", "level": round(prev_low_level, 6), "candles_ago": candles_ago}
+                        break
+
+    # ─── 3. Order Blocks ──────────────────────────────────────
+    order_blocks = []
+    for i in range(2, len(candles) - 1):
+        body_prev = abs(candles[i - 1]["close"] - candles[i - 1]["open"])
+        body_curr = abs(candles[i]["close"] - candles[i]["open"])
+
+        # Strong move after a consolidation candle = potential OB
+        if body_curr > body_prev * 2 and body_curr > 0:
+            # Bullish OB: bearish candle before strong bullish move
+            if candles[i]["close"] > candles[i]["open"] and candles[i - 1]["close"] < candles[i - 1]["open"]:
+                ob = {
+                    "type": "bullish_ob",
+                    "high": round(candles[i - 1]["high"], 6),
+                    "low": round(candles[i - 1]["low"], 6),
+                    "candles_ago": len(candles) - 1 - (i - 1),
+                    "mitigated": candles[-1]["low"] < candles[i - 1]["low"],
+                }
+                order_blocks.append(ob)
+            # Bearish OB: bullish candle before strong bearish move
+            elif candles[i]["close"] < candles[i]["open"] and candles[i - 1]["close"] > candles[i - 1]["open"]:
+                ob = {
+                    "type": "bearish_ob",
+                    "high": round(candles[i - 1]["high"], 6),
+                    "low": round(candles[i - 1]["low"], 6),
+                    "candles_ago": len(candles) - 1 - (i - 1),
+                    "mitigated": candles[-1]["high"] > candles[i - 1]["high"],
+                }
+                order_blocks.append(ob)
+
+    # Keep only recent unmitigated
+    order_blocks = [ob for ob in order_blocks if not ob["mitigated"]][-5:]
+
+    # ─── 4. Fair Value Gaps (FVG) ─────────────────────────────
+    fvgs = []
+    for i in range(2, len(candles)):
+        # Bullish FVG: candle[i] low > candle[i-2] high (gap up)
+        if candles[i]["low"] > candles[i - 2]["high"]:
+            fvg = {
+                "type": "bullish_fvg",
+                "top": round(candles[i]["low"], 6),
+                "bottom": round(candles[i - 2]["high"], 6),
+                "candles_ago": len(candles) - 1 - i,
+                "filled": candles[-1]["low"] <= candles[i - 2]["high"],
+            }
+            fvgs.append(fvg)
+        # Bearish FVG: candle[i] high < candle[i-2] low (gap down)
+        elif candles[i]["high"] < candles[i - 2]["low"]:
+            fvg = {
+                "type": "bearish_fvg",
+                "top": round(candles[i - 2]["low"], 6),
+                "bottom": round(candles[i]["high"], 6),
+                "candles_ago": len(candles) - 1 - i,
+                "filled": candles[-1]["high"] >= candles[i - 2]["low"],
+            }
+            fvgs.append(fvg)
+
+    # Keep unfilled recent
+    fvgs = [f for f in fvgs if not f["filled"]][-5:]
+
+    # ─── 5. Liquidity Zones ───────────────────────────────────
+    # Equal highs/lows (where stop losses accumulate)
+    buy_side_liq = []  # Above price — stop losses of shorts
+    sell_side_liq = []  # Below price — stop losses of longs
+
+    tolerance = _calculate_atr_from_candles(candles, 14) * 0.3 if candles else 0
+
+    for sh in swing_highs[-8:]:
+        buy_side_liq.append(round(sh["price"], 6))
+    for sl in swing_lows[-8:]:
+        sell_side_liq.append(round(sl["price"], 6))
+
+    # Deduplicate close levels
+    buy_side_liq = sorted(set(round(p, 5) for p in buy_side_liq), reverse=True)[:4]
+    sell_side_liq = sorted(set(round(p, 5) for p in sell_side_liq))[:4]
+
+    # ─── 6. Bias ─────────────────────────────────────────────
+    current_price = candles[-1]["close"]
+    bias = "NEUTRAL"
+    reasoning = []
+
+    if trend == "BULLISH":
+        bias = "BUY"
+        reasoning.append(f"Bullish structure (HH+HL)")
+    elif trend == "BEARISH":
+        bias = "SELL"
+        reasoning.append(f"Bearish structure (LH+LL)")
+
+    if bos:
+        reasoning.append(f"BOS {bos['type']} confirmed at {bos['level']}")
+
+    bullish_obs = [ob for ob in order_blocks if ob["type"] == "bullish_ob"]
+    bearish_obs = [ob for ob in order_blocks if ob["type"] == "bearish_ob"]
+
+    if bullish_obs and bias == "BUY":
+        nearest = min(bullish_obs, key=lambda x: x["candles_ago"])
+        reasoning.append(f"Unmitigated bullish OB at {nearest['low']}-{nearest['high']}")
+    if bearish_obs and bias == "SELL":
+        nearest = min(bearish_obs, key=lambda x: x["candles_ago"])
+        reasoning.append(f"Unmitigated bearish OB at {nearest['low']}-{nearest['high']}")
+
+    unfilled_bullish_fvgs = [f for f in fvgs if f["type"] == "bullish_fvg"]
+    unfilled_bearish_fvgs = [f for f in fvgs if f["type"] == "bearish_fvg"]
+    if unfilled_bearish_fvgs and bias == "SELL":
+        reasoning.append(f"Unfilled bearish FVG above")
+    if unfilled_bullish_fvgs and bias == "BUY":
+        reasoning.append(f"Unfilled bullish FVG below")
+
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "trend": trend,
+        "structure": {
+            "last_swing_high": {"price": round(swing_highs[-1]["price"], 6), "candles_ago": swing_highs[-1]["candles_ago"]} if swing_highs else None,
+            "last_swing_low": {"price": round(swing_lows[-1]["price"], 6), "candles_ago": swing_lows[-1]["candles_ago"]} if swing_lows else None,
+            "bos": bos,
+            "choch": choch,
+        },
+        "order_blocks": order_blocks,
+        "fair_value_gaps": fvgs,
+        "liquidity": {
+            "buy_side": buy_side_liq,
+            "sell_side": sell_side_liq,
+        },
+        "bias": bias,
+        "reasoning": ". ".join(reasoning) if reasoning else "No clear directional bias",
+        "current_price": round(current_price, 6),
+    }
+
+
 def register_market_data_tools(mcp):
     """Register all market data tools."""
 
@@ -371,197 +574,4 @@ def register_market_data_tools(mcp):
 
         candles = candle_result.get("candles", []) if isinstance(candle_result, dict) else candle_result
 
-        if len(candles) < 30:
-            return json.dumps({"error": "Not enough candles for structure analysis"})
-
-        # ─── 1. Swing Structure ────────────────────────────────────
-        # Use strength=2 for M15/M5 (faster detection), 3 for H1+
-        swing_strength = 2 if timeframe in ("M5", "M15") else 3
-        swing_highs, swing_lows = _find_swing_points(candles, lookback=swing_strength)
-
-        # ─── 2. Determine Trend & BOS ─────────────────────────────
-        trend = "RANGING"
-        bos = None
-        choch = None
-
-        if len(swing_highs) >= 2 and len(swing_lows) >= 2:
-            # Higher highs + higher lows = bullish
-            recent_highs = sorted(swing_highs, key=lambda x: x["index"], reverse=True)[:3]
-            recent_lows = sorted(swing_lows, key=lambda x: x["index"], reverse=True)[:3]
-
-            if len(recent_highs) >= 2 and len(recent_lows) >= 2:
-                hh = recent_highs[0]["price"] > recent_highs[1]["price"]
-                hl = recent_lows[0]["price"] > recent_lows[1]["price"]
-                lh = recent_highs[0]["price"] < recent_highs[1]["price"]
-                ll = recent_lows[0]["price"] < recent_lows[1]["price"]
-
-                if hh and hl:
-                    trend = "BULLISH"
-                elif lh and ll:
-                    trend = "BEARISH"
-
-                # BOS: check if ANY candle in the lookback broke previous swing
-                # (not just current price — captures historical breaks)
-                last_price = candles[-1]["close"]
-                if trend == "BULLISH" and len(recent_highs) >= 2:
-                    prev_high = recent_highs[1]["price"]
-                    # Check if any recent candle broke above prev_high
-                    for j in range(max(0, recent_highs[1]["index"]), len(candles)):
-                        if candles[j]["high"] > prev_high:
-                            candles_ago = len(candles) - 1 - j
-                            bos = {"type": "bullish", "level": round(prev_high, 6), "candles_ago": candles_ago, "confirmed": last_price > prev_high}
-                            break
-                elif trend == "BEARISH" and len(recent_lows) >= 2:
-                    prev_low = recent_lows[1]["price"]
-                    # Check if any recent candle broke below prev_low
-                    for j in range(max(0, recent_lows[1]["index"]), len(candles)):
-                        if candles[j]["low"] < prev_low:
-                            candles_ago = len(candles) - 1 - j
-                            bos = {"type": "bearish", "level": round(prev_low, 6), "candles_ago": candles_ago, "confirmed": last_price < prev_low}
-                            break
-
-                # CHoCH: first sign of reversal (structure shift)
-                # Bullish CHoCH: was bearish (LH+LL) but price broke last swing high
-                if trend == "BEARISH" or (lh and ll):
-                    prev_high_level = recent_highs[1]["price"]
-                    for j in range(max(0, recent_highs[1]["index"]), len(candles)):
-                        if candles[j]["high"] > prev_high_level:
-                            candles_ago = len(candles) - 1 - j
-                            choch = {"type": "bullish_choch", "level": round(prev_high_level, 6), "candles_ago": candles_ago}
-                            break
-                # Bearish CHoCH: was bullish (HH+HL) but price broke last swing low
-                elif trend == "BULLISH" or (hh and hl):
-                    prev_low_level = recent_lows[1]["price"]
-                    for j in range(max(0, recent_lows[1]["index"]), len(candles)):
-                        if candles[j]["low"] < prev_low_level:
-                            candles_ago = len(candles) - 1 - j
-                            choch = {"type": "bearish_choch", "level": round(prev_low_level, 6), "candles_ago": candles_ago}
-                            break
-
-        # ─── 3. Order Blocks ──────────────────────────────────────
-        order_blocks = []
-        for i in range(2, len(candles) - 1):
-            body_prev = abs(candles[i - 1]["close"] - candles[i - 1]["open"])
-            body_curr = abs(candles[i]["close"] - candles[i]["open"])
-
-            # Strong move after a consolidation candle = potential OB
-            if body_curr > body_prev * 2 and body_curr > 0:
-                # Bullish OB: bearish candle before strong bullish move
-                if candles[i]["close"] > candles[i]["open"] and candles[i - 1]["close"] < candles[i - 1]["open"]:
-                    ob = {
-                        "type": "bullish_ob",
-                        "high": round(candles[i - 1]["high"], 6),
-                        "low": round(candles[i - 1]["low"], 6),
-                        "candles_ago": len(candles) - 1 - (i - 1),
-                        "mitigated": candles[-1]["low"] < candles[i - 1]["low"],
-                    }
-                    order_blocks.append(ob)
-                # Bearish OB: bullish candle before strong bearish move
-                elif candles[i]["close"] < candles[i]["open"] and candles[i - 1]["close"] > candles[i - 1]["open"]:
-                    ob = {
-                        "type": "bearish_ob",
-                        "high": round(candles[i - 1]["high"], 6),
-                        "low": round(candles[i - 1]["low"], 6),
-                        "candles_ago": len(candles) - 1 - (i - 1),
-                        "mitigated": candles[-1]["high"] > candles[i - 1]["high"],
-                    }
-                    order_blocks.append(ob)
-
-        # Keep only recent unmitigated
-        order_blocks = [ob for ob in order_blocks if not ob["mitigated"]][-5:]
-
-        # ─── 4. Fair Value Gaps (FVG) ─────────────────────────────
-        fvgs = []
-        for i in range(2, len(candles)):
-            # Bullish FVG: candle[i] low > candle[i-2] high (gap up)
-            if candles[i]["low"] > candles[i - 2]["high"]:
-                fvg = {
-                    "type": "bullish_fvg",
-                    "top": round(candles[i]["low"], 6),
-                    "bottom": round(candles[i - 2]["high"], 6),
-                    "candles_ago": len(candles) - 1 - i,
-                    "filled": candles[-1]["low"] <= candles[i - 2]["high"],
-                }
-                fvgs.append(fvg)
-            # Bearish FVG: candle[i] high < candle[i-2] low (gap down)
-            elif candles[i]["high"] < candles[i - 2]["low"]:
-                fvg = {
-                    "type": "bearish_fvg",
-                    "top": round(candles[i - 2]["low"], 6),
-                    "bottom": round(candles[i]["high"], 6),
-                    "candles_ago": len(candles) - 1 - i,
-                    "filled": candles[-1]["high"] >= candles[i - 2]["low"],
-                }
-                fvgs.append(fvg)
-
-        # Keep unfilled recent
-        fvgs = [f for f in fvgs if not f["filled"]][-5:]
-
-        # ─── 5. Liquidity Zones ───────────────────────────────────
-        # Equal highs/lows (where stop losses accumulate)
-        buy_side_liq = []  # Above price — stop losses of shorts
-        sell_side_liq = []  # Below price — stop losses of longs
-
-        tolerance = _calculate_atr_from_candles(candles, 14) * 0.3 if candles else 0
-
-        for sh in swing_highs[-8:]:
-            buy_side_liq.append(round(sh["price"], 6))
-        for sl in swing_lows[-8:]:
-            sell_side_liq.append(round(sl["price"], 6))
-
-        # Deduplicate close levels
-        buy_side_liq = sorted(set(round(p, 5) for p in buy_side_liq), reverse=True)[:4]
-        sell_side_liq = sorted(set(round(p, 5) for p in sell_side_liq))[:4]
-
-        # ─── 6. Bias ─────────────────────────────────────────────
-        current_price = candles[-1]["close"]
-        bias = "NEUTRAL"
-        reasoning = []
-
-        if trend == "BULLISH":
-            bias = "BUY"
-            reasoning.append(f"Bullish structure (HH+HL)")
-        elif trend == "BEARISH":
-            bias = "SELL"
-            reasoning.append(f"Bearish structure (LH+LL)")
-
-        if bos:
-            reasoning.append(f"BOS {bos['type']} confirmed at {bos['level']}")
-
-        bullish_obs = [ob for ob in order_blocks if ob["type"] == "bullish_ob"]
-        bearish_obs = [ob for ob in order_blocks if ob["type"] == "bearish_ob"]
-
-        if bullish_obs and bias == "BUY":
-            nearest = min(bullish_obs, key=lambda x: x["candles_ago"])
-            reasoning.append(f"Unmitigated bullish OB at {nearest['low']}-{nearest['high']}")
-        if bearish_obs and bias == "SELL":
-            nearest = min(bearish_obs, key=lambda x: x["candles_ago"])
-            reasoning.append(f"Unmitigated bearish OB at {nearest['low']}-{nearest['high']}")
-
-        unfilled_bullish_fvgs = [f for f in fvgs if f["type"] == "bullish_fvg"]
-        unfilled_bearish_fvgs = [f for f in fvgs if f["type"] == "bearish_fvg"]
-        if unfilled_bearish_fvgs and bias == "SELL":
-            reasoning.append(f"Unfilled bearish FVG above")
-        if unfilled_bullish_fvgs and bias == "BUY":
-            reasoning.append(f"Unfilled bullish FVG below")
-
-        return json.dumps({
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "trend": trend,
-            "structure": {
-                "last_swing_high": {"price": round(swing_highs[-1]["price"], 6), "candles_ago": swing_highs[-1]["candles_ago"]} if swing_highs else None,
-                "last_swing_low": {"price": round(swing_lows[-1]["price"], 6), "candles_ago": swing_lows[-1]["candles_ago"]} if swing_lows else None,
-                "bos": bos,
-                "choch": choch,
-            },
-            "order_blocks": order_blocks,
-            "fair_value_gaps": fvgs,
-            "liquidity": {
-                "buy_side": buy_side_liq,
-                "sell_side": sell_side_liq,
-            },
-            "bias": bias,
-            "reasoning": ". ".join(reasoning) if reasoning else "No clear directional bias",
-            "current_price": round(current_price, 6),
-        })
+        return json.dumps(_analyze_market_structure(candles, symbol, timeframe))

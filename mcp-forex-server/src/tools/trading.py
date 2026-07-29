@@ -347,12 +347,26 @@ def register_trading_tools(mcp):
         for trade in (db_open_trades or []):
             if trade["ticket"] not in mt5_tickets:
                 # Trade was closed by broker (SL/TP hit) — get history from bridge
+                pair = execute_one("SELECT symbol FROM pairs WHERE id = %s", (trade["pair_id"],))
+                symbol = pair["symbol"] if pair else ""
+
                 history = bridge.get_deal_history(trade["ticket"])
-                if history and "error" not in history:
+
+                def _symbol_matches(h):
+                    returned = (h.get("symbol") or "").replace("#", "").replace(".", "")
+                    return not symbol or not returned or returned == symbol
+
+                if history and "error" not in history and not _symbol_matches(history):
+                    # Two positions closing in the same 15-min cycle have been observed
+                    # returning the wrong (stale) deal from MT5's history cache. Retry
+                    # once before giving up rather than trusting mismatched data.
+                    import time
+                    time.sleep(1)
+                    history = bridge.get_deal_history(trade["ticket"])
+
+                if history and "error" not in history and _symbol_matches(history):
                     exit_price = history.get("price", 0)
                     pnl_usd = history.get("profit", 0)
-                    pair = execute_one("SELECT symbol FROM pairs WHERE id = %s", (trade["pair_id"],))
-                    symbol = pair["symbol"] if pair else ""
                     pip_size = 0.01 if "JPY" in symbol else 0.0001
 
                     entry_price = float(trade["entry_price"])
@@ -383,14 +397,20 @@ def register_trading_tools(mcp):
                     )
                     reconciled.append({"ticket": trade["ticket"], "pnl_usd": round(pnl_usd, 2), "reason": close_reason})
                 else:
-                    # Can't get history — mark as closed with unknown
+                    # Can't get reliable history (missing or symbol mismatch even after
+                    # retry) — do NOT guess exit_price/pnl. Mark unverified for manual
+                    # review instead of writing data that would corrupt PnL tracking and
+                    # the consecutive-loss cooldown.
                     execute(
-                        """UPDATE trades SET close_reason = 'broker_closed', status = 'closed',
+                        """UPDATE trades SET close_reason = 'broker_closed_unverified', status = 'closed',
                             closed_at = NOW(), updated_at = NOW()
                         WHERE id = %s""",
                         (trade["id"],)
                     )
-                    reconciled.append({"ticket": trade["ticket"], "pnl_usd": 0, "reason": "broker_closed"})
+                    reconciled.append({
+                        "ticket": trade["ticket"], "pnl_usd": 0, "reason": "broker_closed_unverified",
+                        "needs_manual_review": True,
+                    })
 
         # --- Build enriched positions list ---
         enriched = []

@@ -55,15 +55,15 @@ def register_system_tools(mcp):
         )
 
         recent = execute(
-            "SELECT pnl_usd FROM trades WHERE user_id = %s AND status = 'closed' ORDER BY closed_at DESC LIMIT 10",
+            "SELECT pnl_usd FROM trades WHERE user_id = %s AND status = 'closed' ORDER BY closed_at DESC LIMIT 20",
             (USER_ID,)
         )
         consecutive_losses = 0
         for r in recent:
-            if r["pnl_usd"] is not None and float(r["pnl_usd"]) <= 0:
+            if r["pnl_usd"] is not None and float(r["pnl_usd"]) < 0:
                 consecutive_losses += 1
             else:
-                break
+                break  # win or breakeven trade — streak ends here
 
         state = {
             "open_positions": open_count["cnt"] if open_count else 0,
