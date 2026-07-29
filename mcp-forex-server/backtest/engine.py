@@ -204,13 +204,18 @@ class BacktestResult:
 
 
 def evaluate_entry(asof: _AsOf, symbol: str, t: int, dt_utc: datetime, settings: Settings) -> Position | None:
-    """Advance this symbol's candle pointers to T, slice D1/H4/H1/M15, and score
-    the setup via the SAME evaluate_setup() the live get_trade_quality_score()
-    tool uses — no separate scoring logic here, so backtest and live can't drift."""
+    """Advance this symbol's candle pointers to T and score the setup via the
+    SAME evaluate_setup() the live get_trade_quality_score() tool uses — no
+    separate scoring logic here, so backtest and live can't drift. Passes
+    _AsOf's per-bar cache in so D1/H4/H1 analysis isn't recomputed on every
+    M15 tick (only when that timeframe's bar actually advances)."""
     idx = {tf: asof.advance(symbol, tf, t) for tf in ("D1", "H4", "H1", "M15")}
-    candles_by_tf = {tf: asof.slice(symbol, tf, idx[tf]) for tf in ("D1", "H4", "H1", "M15")}
 
-    result = evaluate_setup(symbol, candles_by_tf=candles_by_tf, dt_utc=dt_utc, min_adx_entry=settings.min_adx_entry)
+    result = evaluate_setup(
+        symbol, dt_utc=dt_utc, min_adx_entry=settings.min_adx_entry,
+        full_analysis_fn=lambda sym, tf: asof.full_analysis(sym, tf, idx[tf]),
+        structure_fn=lambda sym, tf: asof.structure(sym, tf, idx[tf]),
+    )
     if "no_setup" in result:
         return None
     if result["score"] < settings.score_threshold:

@@ -104,6 +104,8 @@ def evaluate_setup(
     candles_by_tf: dict[str, list[dict]] = None,
     dt_utc: datetime = None,
     min_adx_entry: float = 15.0,
+    full_analysis_fn=None,
+    structure_fn=None,
 ) -> dict:
     """
     Determine trade direction from H4 bias and compute the Trade Quality Score.
@@ -114,6 +116,12 @@ def evaluate_setup(
             data from the bridge (same as the MCP tools do by default).
         dt_utc: Timestamp to evaluate session-optimality at. Defaults to now.
         min_adx_entry: ADX floor (normally read from trading_settings by the caller).
+        full_analysis_fn: Optional override, signature (symbol, tf) -> analysis
+            dict or None. Lets the backtest engine inject its per-bar cache
+            instead of recomputing RSI/MACD/ADX/divergences from scratch on
+            every M15 tick (D1/H4/H1 only change once their bar closes).
+        structure_fn: Optional override, signature (symbol, tf) -> structure
+            dict or None, same caching purpose for SMC structure analysis.
 
     Returns:
         {"no_setup": reason} if there's no valid H4 bias / direction to trade,
@@ -124,9 +132,13 @@ def evaluate_setup(
     cbt = candles_by_tf or {}
 
     def full(tf):
+        if full_analysis_fn:
+            return full_analysis_fn(symbol, tf)
         return get_full_analysis(symbol, tf, candles=cbt.get(tf))
 
     def structure(tf, lookback=100):
+        if structure_fn:
+            return structure_fn(symbol, tf)
         if candles_by_tf is not None:
             sl = cbt.get(tf, [])
             if len(sl) < 30:
