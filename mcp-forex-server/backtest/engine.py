@@ -34,49 +34,12 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 
-import pytz
-
 from src.clients.local_indicators import get_full_analysis
 from src.tools.market_data import _analyze_market_structure
+from src.tools.quality_score import evaluate_setup, pip_size as _pip_size
 
 ANALYSIS_WINDOW = 200  # matches count=200 used by forex_analysis/forex_multi_timeframe live
 STRUCTURE_WINDOW = {"D1": 200, "H4": 200, "H1": 200, "M15": 100}
-
-SESSION_PAIRS = {
-    "sydney": {"AUDUSD", "NZDUSD"},
-    "tokyo": {"USDJPY", "AUDUSD", "GBPJPY"},
-    "london": {"EURUSD", "GBPUSD", "EURGBP", "USDCAD", "USDCHF"},
-    "new_york": {"EURUSD", "GBPUSD", "USDJPY", "USDCAD", "GBPJPY"},
-}
-TOKYO_TZ = pytz.timezone("Asia/Tokyo")
-LONDON_TZ = pytz.timezone("Europe/London")
-NY_TZ = pytz.timezone("America/New_York")
-SYDNEY_TZ = pytz.timezone("Australia/Sydney")
-
-
-def _active_sessions(dt_utc: datetime) -> set[str]:
-    from datetime import time as dt_time
-    sessions = set()
-    if dt_time(9, 0) <= dt_utc.astimezone(TOKYO_TZ).time() <= dt_time(18, 0):
-        sessions.add("tokyo")
-    if dt_time(8, 0) <= dt_utc.astimezone(LONDON_TZ).time() <= dt_time(17, 0):
-        sessions.add("london")
-    if dt_time(8, 0) <= dt_utc.astimezone(NY_TZ).time() <= dt_time(17, 0):
-        sessions.add("new_york")
-    if dt_time(7, 0) <= dt_utc.astimezone(SYDNEY_TZ).time() <= dt_time(16, 0):
-        sessions.add("sydney")
-    return sessions
-
-
-def _optimal_pairs_now(dt_utc: datetime) -> set[str]:
-    optimal = set()
-    for s in _active_sessions(dt_utc):
-        optimal |= SESSION_PAIRS.get(s, set())
-    return optimal
-
-
-def _pip_size(symbol: str) -> float:
-    return 0.01 if "JPY" in symbol else 0.0001
 
 
 def _pip_value_per_lot(symbol: str, price: float) -> float:
@@ -240,108 +203,30 @@ class BacktestResult:
     starting_balance: float = 0.0
 
 
-def _multi_tf_score(asof: _AsOf, symbol: str, t: int, idx_d1: int, idx_h4: int, idx_h1: int) -> tuple[int, dict]:
-    score = 0
-    per_tf = {}
-    for tf, idx in (("D1", idx_d1), ("H4", idx_h4), ("H1", idx_h1)):
-        a = asof.full_analysis(symbol, tf, idx)
-        if a is None:
-            per_tf[tf] = None
-            continue
-        rec = a["recommendation"]
-        contrib = 1 if rec in ("BUY", "STRONG_BUY") else -1 if rec in ("SELL", "STRONG_SELL") else 0
-        score += contrib
-        per_tf[tf] = a
-    return score, per_tf
-
-
-def _near_poi(price: float, structure: dict, side: str, atr_price: float) -> bool:
-    """Is price inside (or within ~0.3xATR of) an unmitigated OB / unfilled FVG
-    matching the trade direction?"""
-    if not structure:
-        return False
-    want_ob = "bullish_ob" if side == "BUY" else "bearish_ob"
-    want_fvg = "bullish_fvg" if side == "BUY" else "bearish_fvg"
-    buf = atr_price * 0.3
-    for ob in structure.get("order_blocks", []):
-        if ob["type"] == want_ob and (ob["low"] - buf) <= price <= (ob["high"] + buf):
-            return True
-    for fvg in structure.get("fair_value_gaps", []):
-        if fvg["type"] == want_fvg and (fvg["bottom"] - buf) <= price <= (fvg["top"] + buf):
-            return True
-    return False
-
-
 def evaluate_entry(asof: _AsOf, symbol: str, t: int, dt_utc: datetime, settings: Settings) -> Position | None:
-    idx_d1 = asof.advance(symbol, "D1", t)
-    idx_h4 = asof.advance(symbol, "H4", t)
-    idx_h1 = asof.advance(symbol, "H1", t)
-    idx_m15 = asof.advance(symbol, "M15", t)
+    """Advance this symbol's candle pointers to T, slice D1/H4/H1/M15, and score
+    the setup via the SAME evaluate_setup() the live get_trade_quality_score()
+    tool uses — no separate scoring logic here, so backtest and live can't drift."""
+    idx = {tf: asof.advance(symbol, tf, t) for tf in ("D1", "H4", "H1", "M15")}
+    candles_by_tf = {tf: asof.slice(symbol, tf, idx[tf]) for tf in ("D1", "H4", "H1", "M15")}
 
-    h4_structure = asof.structure(symbol, "H4", idx_h4)
-    if not h4_structure or h4_structure["bias"] not in ("BUY", "SELL"):
-        return None  # H4 RANGING or no data — "NUNCA operes contra el H4" / no bias = no trade
-    side = h4_structure["bias"]
-
-    align_score, per_tf = _multi_tf_score(asof, symbol, t, idx_d1, idx_h4, idx_h1)
-    h1_analysis = per_tf.get("H1")
-    d1_analysis = per_tf.get("D1")
-    if h1_analysis is None or d1_analysis is None:
+    result = evaluate_setup(symbol, candles_by_tf=candles_by_tf, dt_utc=dt_utc, min_adx_entry=settings.min_adx_entry)
+    if "no_setup" in result:
+        return None
+    if result["score"] < settings.score_threshold:
         return None
 
-    # Direction must agree with the broader D1+H4+H1 alignment (not just H4 alone)
-    if (side == "BUY" and align_score < 0) or (side == "SELL" and align_score > 0):
-        return None
-
-    # ADX / alignment permissive filter, mirrors forex_market_scan()
-    adx = h1_analysis["indicators"]["adx_14"]
-    if adx < settings.min_adx_entry and abs(align_score) < 1:
-        return None
-
-    # RSI D1 exception — ABSOLUTE per AGENT_PROMPT_V2.md
-    rsi_d1 = d1_analysis["indicators"]["rsi_14"]
-    if side == "SELL" and rsi_d1 < 30:
-        return None
-    if side == "BUY" and rsi_d1 > 70:
-        return None
-
-    d1_structure = asof.structure(symbol, "D1", idx_d1)
-    m15_structure = asof.structure(symbol, "M15", idx_m15)
-    if not m15_structure:
-        return None
-    current_price = m15_structure["current_price"]
-    atr_price = h1_analysis["indicators"]["atr_14"]
-
-    # ─── Trade Quality Score (proxy of AGENT_PROMPT_V2.md Paso 4) ───
-    score = 1  # H4 bias matches side — mandatory, already guaranteed by construction
-    if _near_poi(current_price, h4_structure, side, atr_price) or _near_poi(current_price, d1_structure or {}, side, atr_price):
-        score += 1
-    m15_bos, m15_choch = m15_structure["structure"]["bos"], m15_structure["structure"]["choch"]
-    want_bos = "bullish" if side == "BUY" else "bearish"
-    want_choch = "bullish_choch" if side == "BUY" else "bearish_choch"
-    fresh = 8  # M15 candles ~= 2 hours, loose proxy for "fresh trigger"
-    if (m15_bos and m15_bos["type"] == want_bos and m15_bos["candles_ago"] <= fresh) or \
-       (m15_choch and m15_choch["type"] == want_choch and m15_choch["candles_ago"] <= fresh):
-        score += 1
-    if any(d.get("signal") == side for d in h1_analysis.get("divergences", [])):
-        score += 1
-    if symbol in _optimal_pairs_now(dt_utc):
-        score += 1
-
-    if score < settings.score_threshold:
-        return None
-
-    h1_structure = asof.structure(symbol, "H1", idx_h1)
-    sltp = calc_optimal_sl_tp(symbol, side, h1_analysis, h1_structure or {}, settings.min_rr_ratio)
+    side = result["side"]
+    sltp = calc_optimal_sl_tp(symbol, side, result["h1_analysis"], result["h1_structure"] or {}, settings.min_rr_ratio)
     if sltp["rr_ratio"] < settings.min_rr_ratio:
         return None
 
     return Position(
-        symbol=symbol, side=side, entry_time=t, entry_price=current_price,
+        symbol=symbol, side=side, entry_time=t, entry_price=result["current_price"],
         sl_price=sltp["sl_price"], tp_price=sltp["tp_price"],
         sl_pips=sltp["sl_pips"], tp_pips=sltp["tp_pips"],
-        lot_size=0.0, risk_usd=0.0, score=score,
-        reasoning=f"H4={side} align={align_score} adx={adx:.1f} score={score}",
+        lot_size=0.0, risk_usd=0.0, score=result["score"],
+        reasoning=f"H4={side} align={result['align_score']} adx={result['adx_h1']:.1f} score={result['score']}",
     )
 
 

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from src.core.db import execute, execute_one
 from src.clients.local_indicators import get_full_analysis
+from src.tools.quality_score import evaluate_setup
 
 USER_ID = os.getenv("USER_ID", "")
 
@@ -320,6 +321,29 @@ def register_smart_tools(mcp):
                 f"({minutes_since_last_loss:.0f}/{cooldown_minutes} min)"
             )
 
+        # 7. Post-loss cooldown — short pause after ANY single loss, independent of
+        # the streak-based cooldown above. Implements the prompt's "tras SL hit
+        # espera N ciclos" rule, which previously had no code enforcement at all.
+        post_loss_cooldown = int(s.get("post_loss_cooldown_minutes", 60))
+        last_trade = recent[0] if recent else None
+        post_loss_ok = True
+        minutes_since_last_trade = None
+        if last_trade and last_trade["pnl_usd"] is not None and float(last_trade["pnl_usd"]) < 0:
+            minutes_since_last_trade = (now - last_trade["closed_at"]).total_seconds() / 60
+            post_loss_ok = minutes_since_last_trade >= post_loss_cooldown
+
+        checks["post_loss_cooldown_ok"] = {
+            "pass": post_loss_ok,
+            "detail": (
+                f"Ultima operacion fue perdida hace {minutes_since_last_trade:.0f} min (cooldown: {post_loss_cooldown} min)"
+                if minutes_since_last_trade is not None else "Ultima operacion no fue perdida — sin cooldown"
+            ),
+        }
+        if not post_loss_ok:
+            blocked_reasons.append(
+                f"Cooldown post-perdida activo ({minutes_since_last_trade:.0f}/{post_loss_cooldown} min)"
+            )
+
         can_trade = len(blocked_reasons) == 0
 
         result = {
@@ -457,4 +481,42 @@ def register_smart_tools(mcp):
             "recommended_tp": "take_profit_2" if rr2 >= min_rr else "take_profit_1",
             "min_rr_required": min_rr,
             "valid": rr1 >= min_rr or rr2 >= min_rr,
+        })
+
+    @mcp.tool()
+    def get_trade_quality_score(symbol: str) -> str:
+        """
+        Score a potential setup on `symbol` right now using the Trade Quality
+        Score rubric (H4 bias, POI, M15 BOS/CHoCH, RSI H1 divergence, session).
+        Same scoring code the backtest engine uses — single source of truth.
+        Threshold comes from trading_settings.min_quality_score, not a number
+        written in the prompt, so changing it doesn't require editing the prompt.
+
+        Args:
+            symbol: Forex pair (EURUSD, etc)
+
+        Returns:
+            side (BUY/SELL recommended by H4 bias), score, breakdown of which
+            factors hit, min_required from DB, and passes (bool) — only open a
+            real position when passes=true. no_setup explains why there's
+            nothing to trade (H4 ranging, RSI D1 exception, low ADX, etc).
+        """
+        s = _get_settings()
+        min_score = int(s.get("min_quality_score", 3))
+        min_adx = float(s.get("min_adx_entry", 15.0))
+
+        result = evaluate_setup(symbol, min_adx_entry=min_adx)
+        if "no_setup" in result:
+            return json.dumps({"symbol": symbol, "passes": False, "no_setup": result["no_setup"]})
+
+        return json.dumps({
+            "symbol": symbol,
+            "side": result["side"],
+            "score": result["score"],
+            "breakdown": result["breakdown"],
+            "min_required": min_score,
+            "passes": result["score"] >= min_score,
+            "align_score": result["align_score"],
+            "rsi_d1": round(result["rsi_d1"], 1),
+            "adx_h1": round(result["adx_h1"], 1),
         })

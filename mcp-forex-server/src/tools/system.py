@@ -31,6 +31,9 @@ def register_system_tools(mcp):
                 "max_drawdown_pct": float(s.get("max_drawdown_pct", 5.0)),
                 "max_consecutive_losses": int(s.get("max_consecutive_losses", 5)),
                 "min_rr_ratio": float(s.get("min_rr_ratio", 1.5)),
+                "min_quality_score": int(s.get("min_quality_score", 3)),
+                "post_loss_cooldown_minutes": int(s.get("post_loss_cooldown_minutes", 60)),
+                "consecutive_loss_cooldown_minutes": int(s.get("consecutive_loss_cooldown_minutes", 120)),
             },
             "sizing": {
                 "max_lot_size": float(s.get("max_lot_size", 0.50)),
