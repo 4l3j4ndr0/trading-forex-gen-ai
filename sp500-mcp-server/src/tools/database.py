@@ -6,10 +6,12 @@ import json
 import os
 import psycopg2
 import psycopg2.extras
-from datetime import datetime, timezone
+import pytz
+from datetime import datetime, timedelta, timezone, time as dtime
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 USER_ID = os.getenv("USER_ID", "5f7b54c4-3bb5-487e-897e-e273112a914b")
+NY_TZ = pytz.timezone("America/New_York")
 
 
 def _get_conn():
@@ -193,6 +195,117 @@ def register_database_tools(mcp):
         """, (USER_ID, decision, trades_opened, trades_closed, floating_pnl, now))
 
         return json.dumps({"status": "logged", "time": now.strftime("%H:%M UTC")})
+
+    @mcp.tool()
+    async def sp500_check_trading_allowed() -> str:
+        """
+        Gate real para nuevas entradas SP500 — llamar antes de evaluar cualquier
+        setup nuevo. Aplica kill_switch, auto_trading_enabled, max_daily_loss_pct,
+        max_consecutive_losses, y el tope de 1 trade por dia (calendario ET).
+
+        min_structure_score / min_sweep_distance_points se devuelven como
+        umbrales (no se evaluan aqui — no hay un setup concreto que comparar
+        en este tool) para que el trigger de entrada los aplique contra el
+        spring/upthrust detectado.
+
+        Si can_trade=false, no abrir posiciones nuevas — leer blocked_reasons.
+        """
+        from src.clients.database import get_settings
+        from src.clients import mt5_bridge
+
+        settings = get_settings(force_refresh=True)
+        now_utc = datetime.now(timezone.utc)
+        today_et = now_utc.astimezone(NY_TZ).date()
+        day_start_et = NY_TZ.localize(datetime.combine(today_et, dtime.min))
+        day_start_utc = day_start_et.astimezone(timezone.utc)
+        day_end_utc = day_start_utc + timedelta(days=1)
+
+        checks = {}
+        blocked_reasons = []
+
+        kill_switch = bool(settings.get("kill_switch"))
+        checks["kill_switch_off"] = {
+            "pass": not kill_switch,
+            "detail": "Kill switch OFF" if not kill_switch else "Kill switch ON — todo bloqueado",
+        }
+        if kill_switch:
+            blocked_reasons.append("Kill switch activo")
+
+        auto_enabled = bool(settings.get("auto_trading_enabled", True))
+        checks["auto_trading_enabled"] = {
+            "pass": auto_enabled,
+            "detail": "Auto trading ON" if auto_enabled else "auto_trading_enabled = false",
+        }
+        if not auto_enabled:
+            blocked_reasons.append("auto_trading_enabled = false")
+
+        # 1 trade/dia (calendario ET) — cuenta cualquier trade abierto hoy,
+        # abierto o cerrado, no solo los cerrados.
+        trades_today = _execute_one(
+            "SELECT COUNT(*) as cnt FROM sp500_trades WHERE user_id = %s AND opened_at >= %s AND opened_at < %s",
+            (USER_ID, day_start_utc, day_end_utc)
+        )
+        count_today = trades_today["cnt"] if trades_today else 0
+        daily_cap_ok = count_today < 1
+        checks["daily_trade_cap_ok"] = {
+            "pass": daily_cap_ok,
+            "detail": f"Trades hoy (ET): {count_today}/1",
+        }
+        if not daily_cap_ok:
+            blocked_reasons.append("Tope diario alcanzado — ya se abrio 1 trade hoy")
+
+        # Daily loss limit
+        account = await mt5_bridge.get_account_info()
+        balance = float(account.get("balance", 0)) if "error" not in account else 0
+        max_loss_pct = float(settings.get("max_daily_loss_pct", 5.0))
+        max_loss_usd = balance * max_loss_pct / 100
+        daily_pnl_row = _execute_one(
+            """SELECT COALESCE(SUM(pnl_usd), 0) as total FROM sp500_trades
+            WHERE user_id = %s AND status = 'closed' AND closed_at >= %s AND closed_at < %s""",
+            (USER_ID, day_start_utc, day_end_utc)
+        )
+        daily_pnl = float(daily_pnl_row["total"]) if daily_pnl_row else 0
+        loss_ok = balance <= 0 or daily_pnl > -max_loss_usd
+        checks["daily_loss_ok"] = {
+            "pass": loss_ok,
+            "detail": f"PnL hoy: ${daily_pnl:.2f} (limite: -${max_loss_usd:.2f})",
+        }
+        if not loss_ok:
+            blocked_reasons.append(f"Limite de perdida diaria alcanzado (${daily_pnl:.2f})")
+
+        # Consecutive losses
+        max_con_losses = int(settings.get("max_consecutive_losses", 5))
+        recent = _execute(
+            "SELECT pnl_usd FROM sp500_trades WHERE user_id = %s AND status = 'closed' ORDER BY closed_at DESC LIMIT %s",
+            (USER_ID, max(max_con_losses * 2, 10))
+        )
+        consecutive_losses = 0
+        for r in recent:
+            if r["pnl_usd"] is not None and float(r["pnl_usd"]) < 0:
+                consecutive_losses += 1
+            else:
+                break
+        con_ok = consecutive_losses < max_con_losses
+        checks["consecutive_losses_ok"] = {
+            "pass": con_ok,
+            "detail": f"Perdidas consecutivas: {consecutive_losses} (max: {max_con_losses})",
+        }
+        if not con_ok:
+            blocked_reasons.append(f"Racha de {consecutive_losses} perdidas consecutivas alcanzo el maximo")
+
+        can_trade = len(blocked_reasons) == 0
+
+        return json.dumps({
+            "can_trade": can_trade,
+            "timestamp": now_utc.isoformat(),
+            "trading_day_et": today_et.isoformat(),
+            "checks": checks,
+            "thresholds": {
+                "min_structure_score": settings.get("min_structure_score"),
+                "min_sweep_distance_points": settings.get("min_sweep_distance_points"),
+            },
+            "blocked_reasons": blocked_reasons,
+        })
 
     @mcp.tool()
     async def sp500_get_settings() -> str:

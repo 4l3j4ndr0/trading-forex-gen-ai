@@ -3,32 +3,33 @@ SP500 Session Guardian — Time-boxing tool with DST awareness
 Uses America/New_York timezone to dynamically calculate killzones.
 No need to manually update UTC offsets when clocks change.
 
-NY Market Hours (local time, fixed year-round):
+Killzone boundaries come from sp500_settings (am_killzone_start/end,
+pm_killzone_start/end, premarket_start, regular_session_start/end) as
+ET-local "HH:MM" strings — the DST conversion to UTC below is always
+applied on top of them, so the DB never needs to store a UTC offset.
+
+NY Market Hours (local time, fixed year-round, DB defaults):
 - Pre-market: 08:00 - 09:30 ET
 - AM Killzone: 09:30 - 11:30 ET (first 2 hours = highest volume)
 - Lunch: 11:30 - 14:00 ET (low volume chop)
 - PM Killzone: 14:00 - 16:00 ET (end-of-day positioning)
 - Regular session: 09:30 - 16:00 ET
-
-DST impact on UTC:
-- Summer (Mar-Nov): ET = UTC-4 → AM KZ = 13:30-15:30 UTC
-- Winter (Nov-Mar): ET = UTC-5 → AM KZ = 14:30-16:30 UTC
 """
 import json
 from datetime import datetime, time
 import pytz
+from src.clients.database import get_settings
 
 NY_TZ = pytz.timezone("America/New_York")
 
-# Fixed NY local times (these never change)
-PREMARKET_START = time(8, 0)
-AM_KZ_START = time(9, 30)
-AM_KZ_END = time(11, 30)
-LUNCH_START = time(11, 30)
-LUNCH_END = time(14, 0)
-PM_KZ_START = time(14, 0)
-PM_KZ_END = time(16, 0)
-REGULAR_END = time(16, 0)
+
+def _parse_hhmm(value: str, fallback: time) -> time:
+    """Parse a DB 'HH:MM' string (ET-local) into a time object."""
+    try:
+        h, m = str(value).split(":")
+        return time(int(h), int(m))
+    except (ValueError, AttributeError):
+        return fallback
 
 
 def register_session_tools(mcp):
@@ -38,9 +39,18 @@ def register_session_tools(mcp):
         """
         Validates if the current time is within SP500 tradeable killzones.
         Uses America/New_York timezone — automatically handles DST transitions.
-        SP500 only trades during NY AM Killzone (09:30-11:30 ET) and PM Killzone (14:00-16:00 ET).
+        Killzone windows come from sp500_settings (DB), not hardcoded values.
         Returns session state, active killzone, and whether trading is allowed.
         """
+        settings = get_settings(force_refresh=True)
+        PREMARKET_START = _parse_hhmm(settings.get("premarket_start"), time(8, 0))
+        AM_KZ_START = _parse_hhmm(settings.get("am_killzone_start"), time(9, 30))
+        AM_KZ_END = _parse_hhmm(settings.get("am_killzone_end"), time(11, 30))
+        PM_KZ_START = _parse_hhmm(settings.get("pm_killzone_start"), time(14, 0))
+        PM_KZ_END = _parse_hhmm(settings.get("pm_killzone_end"), time(16, 0))
+        REGULAR_END = _parse_hhmm(settings.get("regular_session_end"), time(16, 0))
+        LUNCH_START, LUNCH_END = AM_KZ_END, PM_KZ_START
+
         now_utc = datetime.now(pytz.utc)
         now_ny = now_utc.astimezone(NY_TZ)
         ny_time = now_ny.time()
@@ -62,7 +72,7 @@ def register_session_tools(mcp):
                 "killzone": None,
                 "is_dst": is_dst,
                 "utc_offset": utc_offset,
-                "next_session": "Monday 09:30 ET (AM Killzone)"
+                "next_session": f"Monday {AM_KZ_START.strftime('%H:%M')} ET (AM Killzone)"
             })
 
         # Determine session state
@@ -83,11 +93,11 @@ def register_session_tools(mcp):
         elif in_lunch:
             session = "LUNCH_HOUR"
             can_trade = False
-            note = "Low volume chop zone 11:30-14:00 ET. Wait for PM Killzone. Only manage existing positions."
+            note = f"Low volume chop zone {LUNCH_START.strftime('%H:%M')}-{LUNCH_END.strftime('%H:%M')} ET. Wait for PM Killzone. Only manage existing positions."
         elif in_premarket:
             session = "PREMARKET"
             can_trade = False
-            note = "Pre-market 08:00-09:30 ET. Calculate reference levels (Asia/London H/L). No entries."
+            note = f"Pre-market {PREMARKET_START.strftime('%H:%M')}-{AM_KZ_START.strftime('%H:%M')} ET. Calculate reference levels (Asia/London H/L). No entries."
         elif in_regular:
             session = "REGULAR_SESSION"
             can_trade = False
@@ -95,7 +105,8 @@ def register_session_tools(mcp):
         else:
             session = "OFF_HOURS"
             can_trade = False
-            note = f"Market closed. Next AM Killzone: 09:30 ET ({('13:30' if is_dst else '14:30')} UTC)"
+            am_kz_utc = NY_TZ.localize(datetime.combine(now_ny.date(), AM_KZ_START)).astimezone(pytz.utc)
+            note = f"Market closed. Next AM Killzone: {AM_KZ_START.strftime('%H:%M')} ET ({am_kz_utc.strftime('%H:%M')} UTC)"
 
         return json.dumps({
             "can_trade": can_trade,
@@ -110,9 +121,9 @@ def register_session_tools(mcp):
             "in_premarket": in_premarket,
             "regular_session_active": in_regular,
             "time_config": {
-                "am_killzone": "09:30-11:30 ET (dynamic UTC)",
-                "pm_killzone": "14:00-16:00 ET (dynamic UTC)",
-                "regular_session": "09:30-16:00 ET",
+                "am_killzone": f"{AM_KZ_START.strftime('%H:%M')}-{AM_KZ_END.strftime('%H:%M')} ET (dynamic UTC)",
+                "pm_killzone": f"{PM_KZ_START.strftime('%H:%M')}-{PM_KZ_END.strftime('%H:%M')} ET (dynamic UTC)",
+                "regular_session": f"{AM_KZ_START.strftime('%H:%M')}-{REGULAR_END.strftime('%H:%M')} ET",
                 "dst_status": "EDT (UTC-4)" if is_dst else "EST (UTC-5)"
             }
         })

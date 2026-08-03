@@ -38,6 +38,10 @@ def get_settings(force_refresh: bool = False) -> dict:
     Get SP500 settings from database.
     Returns dict with all configuration values.
     Cached in memory, call with force_refresh=True to reload.
+
+    Killzone/session time fields (am_killzone_start/end, pm_killzone_start/end,
+    premarket_start, regular_session_start/end) are ET-LOCAL "HH:MM" strings,
+    not UTC — src.tools.session applies DST-aware conversion on top of them.
     """
     global _settings_cache
     if _settings_cache and not force_refresh:
@@ -60,13 +64,13 @@ def get_settings(force_refresh: bool = False) -> dict:
             "max_consecutive_losses": 5,
             "min_rr_ratio": 1.5,
             "max_open_positions": 5,
-            "am_killzone_start": "13:30",
-            "am_killzone_end": "15:30",
-            "pm_killzone_start": "18:00",
-            "pm_killzone_end": "20:00",
-            "premarket_start": "12:00",
-            "regular_session_start": "13:30",
-            "regular_session_end": "20:00",
+            "am_killzone_start": "09:30",
+            "am_killzone_end": "11:30",
+            "pm_killzone_start": "14:00",
+            "pm_killzone_end": "16:00",
+            "premarket_start": "08:00",
+            "regular_session_start": "09:30",
+            "regular_session_end": "16:00",
             "news_buffer_minutes": 15,
             "daily_target_pct": 1.0,
             "daily_target_points": 30.0,
