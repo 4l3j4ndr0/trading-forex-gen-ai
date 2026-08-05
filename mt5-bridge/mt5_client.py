@@ -93,11 +93,18 @@ class MT5Client:
             info = mt5.symbol_info(mt5_sym)
         tick = mt5.symbol_info_tick(mt5_sym)
         spread_points = info.spread if info.spread else (tick.ask - tick.bid) / info.point if tick else 0
+
+        # Fix: trade_tick_value is per POINT, not per PIP.
+        # On 5-digit brokers 1 pip = 10 points, so we scale up.
+        pip_size = 0.01 if "JPY" in symbol else 0.0001
+        tick_size = info.trade_tick_size if info.trade_tick_size else info.point
+        pip_value = info.trade_tick_value * (pip_size / tick_size) if tick_size else info.trade_tick_value
+
         return {
             "symbol": symbol,
             "spread_points": spread_points,
             "spread_pips": round(spread_points * info.point / (0.01 if "JPY" in symbol else 0.0001), 1),
-            "pip_value": info.trade_tick_value,
+            "pip_value": round(pip_value, 5),
             "min_lot": info.volume_min,
             "max_lot": info.volume_max,
             "lot_step": info.volume_step,

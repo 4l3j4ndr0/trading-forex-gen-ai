@@ -159,27 +159,46 @@ def _analyze_market_structure(candles: list[dict], symbol: str, timeframe: str) 
             elif lh and ll:
                 trend = "BEARISH"
 
-            # BOS: check if ANY candle in the lookback broke previous swing
-            # (not just current price — captures historical breaks)
+            # ─── BOS: evaluate INDEPENDENTLY of trend label ───────
+            # A BOS is the event that CONFIRMS a directional break, not a
+            # consequence of an already-established trend. This allows BOS
+            # detection in RANGING markets (the most important signal).
             last_price = candles[-1]["close"]
-            if trend == "BULLISH" and len(recent_highs) >= 2:
-                prev_high = recent_highs[1]["price"]
-                # Check if any recent candle broke above prev_high
-                for j in range(max(0, recent_highs[1]["index"]), len(candles)):
-                    if candles[j]["high"] > prev_high:
-                        candles_ago = len(candles) - 1 - j
-                        bos = {"type": "bullish", "level": round(prev_high, 6), "candles_ago": candles_ago, "confirmed": last_price > prev_high}
-                        break
-            elif trend == "BEARISH" and len(recent_lows) >= 2:
-                prev_low = recent_lows[1]["price"]
-                # Check if any recent candle broke below prev_low
+
+            # Bullish BOS: price closed above the last confirmed swing high
+            prev_high = recent_highs[-1]["price"]  # oldest of the recent set = reference
+            # Use the second-most-recent (index [1]) as the level to break
+            bos_high_ref = recent_highs[1]["price"]
+            for j in range(max(0, recent_highs[1]["index"]), len(candles)):
+                if candles[j]["high"] > bos_high_ref:
+                    candles_ago = len(candles) - 1 - j
+                    is_confirmed = last_price > bos_high_ref
+                    # Only assign bullish BOS if trend is BULLISH or RANGING
+                    # (in a BEARISH trend, breaking a swing high is a CHoCH, not a BOS)
+                    if trend != "BEARISH":
+                        bos = {"type": "bullish", "level": round(bos_high_ref, 6), "candles_ago": candles_ago, "confirmed": is_confirmed}
+                    break
+
+            # Bearish BOS: price closed below the last confirmed swing low
+            bos_low_ref = recent_lows[1]["price"]
+            if bos is None:  # don't overwrite a bullish BOS
                 for j in range(max(0, recent_lows[1]["index"]), len(candles)):
-                    if candles[j]["low"] < prev_low:
+                    if candles[j]["low"] < bos_low_ref:
                         candles_ago = len(candles) - 1 - j
-                        bos = {"type": "bearish", "level": round(prev_low, 6), "candles_ago": candles_ago, "confirmed": last_price < prev_low}
+                        is_confirmed = last_price < bos_low_ref
+                        # Only assign bearish BOS if trend is BEARISH or RANGING
+                        if trend != "BULLISH":
+                            bos = {"type": "bearish", "level": round(bos_low_ref, 6), "candles_ago": candles_ago, "confirmed": is_confirmed}
                         break
 
-            # CHoCH: first sign of reversal (structure shift)
+            # Upgrade trend from RANGING if BOS is confirmed
+            if trend == "RANGING" and bos:
+                if bos["type"] == "bullish" and bos["confirmed"]:
+                    trend = "BULLISH"
+                elif bos["type"] == "bearish" and bos["confirmed"]:
+                    trend = "BEARISH"
+
+            # ─── CHoCH: first sign of reversal (structure shift) ──
             # Bullish CHoCH: was bearish (LH+LL) but price broke last swing high
             if trend == "BEARISH" or (lh and ll):
                 prev_high_level = recent_highs[1]["price"]

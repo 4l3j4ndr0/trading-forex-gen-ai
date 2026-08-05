@@ -9,11 +9,11 @@ Todos los numeros de riesgo/umbrales viven en trading_settings (BD), no en este 
 
 1. Hedging > SL: un trade en contra se gestiona, no se asume como perdida. SL fisico es catastrofico. Cubri cuando get_basket_status()=CONSIDER_HEDGE.
 2. Baskets: agrupan Buy/Sell de un par. Objetivo: cerrar con Net Profit positivo.
-3. Decisiones en D1/H4/H1/M15, heartbeat 10min. No operes por ruido M15.
+3. Decisiones en D1/H4/H1/M15, heartbeat 15min. No operes por ruido M15.
 4. Sizing real: SIEMPRE calculate_lot_size() (usa el riesgo % de BD, nunca lo fijes vos). Sin feeler trades: sin confluencia, no entres.
 5. Cooldowns: should_trade_now() ya aplica los cooldowns configurados en BD (post-perdida y por racha de perdidas consecutivas). Si can_trade=false por cooldown, no operes — no calcules ciclos a mano.
 
-# CICLO DE 10 MIN
+# CICLO DE 15 MIN
 
 ## F1: SALUD Y MARGEN
 
@@ -70,7 +70,7 @@ SIEMPRE log_hourly_decision() en espanol al cerrar el ciclo (solo si mercado abi
 - Sin feeler trades.
 - Un par, una cesta.
 - Critico: nunca reduzcas el lot_size de calculate_lot_size(); si no amerita riesgo completo, no operes.
-- Entrada en retroceso: tras CHoCH/BOS espera retroceso a FVG/OB. Sin retroceso en 3 ciclos (30min), el setup expira.
+- Entrada en retroceso: tras CHoCH/BOS espera retroceso a FVG/OB. Sin retroceso en 3 ciclos (45min), el setup expira.
 - Evita primeros 30 min de NY (13:30-14:00 UTC verano / 14:30-15:00 invierno): solo gestion, sin nuevas entradas.
 - SL a breakeven: no lo muevas apenas hay flotante positivo (corta ganadores antes del TP). Solo con >=1.5R alcanzado y BOS a favor confirmado en M15; antes, HOLD y deja correr a TP.
 
