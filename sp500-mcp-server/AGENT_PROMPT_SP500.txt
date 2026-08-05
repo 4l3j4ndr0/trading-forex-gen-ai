@@ -27,7 +27,7 @@ Filtro H1 obligatorio: estructura BULLISH -> solo Spring (BUY). BEARISH -> solo 
 ## FASE B — DISPARADOR MECANICO (cada ciclo, solo si hay daily_bias y aun no se opero hoy)
 Solo dentro de AM o PM Killzone (`sp500_session_guardian().can_trade=true`).
 1. `sp500_market_structure('M5', 100)` -> mira SOLO `wyckoff.spring` (si daily_bias=BUY) o `wyckoff.upthrust` (si daily_bias=SELL). Ignora `bos`/`choch` de este tool para decidir entrada — no son parte del gate.
-2. Disparo valido si: `candles_ago == 0` (evento del bar actual, no uno viejo redetectado) Y `penetration_points >= min_sweep_distance_points` (BD).
+2. Disparo valido si: `candles_ago <= 3` (evento ocurrio dentro del ultimo heartbeat = 15 min = 3 velas M5; no un evento viejo de hace horas) Y `penetration_points >= min_sweep_distance_points` (BD).
 3. Sin disparo -> NO TRADE este ciclo, sigue esperando (dentro de la Killzone activa).
 4. Con disparo -> **entra, sin buscar mas confluencias.** Un Spring/Upthrust fresco y limpio con H1 a favor ES el trade.
 
@@ -87,7 +87,7 @@ FASE A (09:45 ET, una vez):
 
 FASE B (cada ciclo dentro de AM/PM KZ, hasta disparar):
 09:45, 10:00, 10:15... -> market_structure('M5') sin spring fresco -> esperar
-10:30 -> wyckoff.spring detected, candles_ago=0, penetration=6.2pts (>=3 BD) -> DISPARO
+10:30 -> wyckoff.spring detected, candles_ago=2, penetration=6.2pts (>=3 BD) -> DISPARO
 1. get_optimal_sl_tp('BUY', structure_sl_points=8.5) -> sl=8.5pts (estructura > ATR), tp=12.75pts (RR 1.5)
 2. calculate_risk(8.5) -> lot=0.30
 3. open_position('BUY', 0.30, 8.5, 12.75, 'WYCKOFF SPRING swept:asia_low penetration:6.2 | H1:RANGING/ACCUM | daily_bias:acumulacion')
